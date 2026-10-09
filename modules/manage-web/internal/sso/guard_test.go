@@ -122,3 +122,26 @@ func TestForgedCallbackAndLogoutCSRF(t *testing.T) {
 		t.Fatalf("logout CSRF %d", denied.Code)
 	}
 }
+
+func TestMissingSSOConfigFailsClosed(t *testing.T) {
+	for _, env := range []string{
+		"MANAFIELD_MANAGE_SSO_AUTHORIZATION_URL",
+		"MANAFIELD_MANAGE_SSO_TOKEN_URL",
+		"MANAFIELD_MANAGE_SSO_USERINFO_URL",
+		"MANAFIELD_MANAGE_SSO_CLIENT_ID",
+		"MANAFIELD_MANAGE_SSO_REDIRECT_URL",
+	} {
+		t.Setenv(env, "")
+	}
+	if _, err := ConfigFromEnv(); err == nil {
+		t.Fatal("Manage must refuse startup without SSO configuration")
+	}
+	t.Setenv("MANAFIELD_MANAGE_SSO_AUTHORIZATION_URL", "https://manafield.studio/account/oauth/authorize")
+	t.Setenv("MANAFIELD_MANAGE_SSO_TOKEN_URL", "http://module-manafield-account-core:8080/account/oauth/token")
+	t.Setenv("MANAFIELD_MANAGE_SSO_USERINFO_URL", "http://module-manafield-account-core:8080/account/oauth/userinfo")
+	t.Setenv("MANAFIELD_MANAGE_SSO_CLIENT_ID", "manafield-manage-web")
+	t.Setenv("MANAFIELD_MANAGE_SSO_REDIRECT_URL", "https://manage.manafield.studio/auth/callback")
+	if _, err := ConfigFromEnv(); err != nil {
+		t.Fatalf("valid first-party deployment SSO config rejected: %v", err)
+	}
+}
