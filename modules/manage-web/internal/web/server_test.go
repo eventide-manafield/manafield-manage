@@ -134,3 +134,46 @@ func TestPublicStylesheetIsNeutral(t *testing.T) {
 		if strings.Contains(css, forbidden) { t.Fatalf("public CSS contains private palette %q", forbidden) }
 	}
 }
+
+func TestStableManageDOMHooks(t *testing.T) {
+	core := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/modules":
+			_, _ = w.Write([]byte(`[{"id":"sample-module","name":"Sample module","version":"1.0.0"}]`))
+		case "/resources":
+			_, _ = w.Write([]byte(`[{"id":"sample-db","name":"Sample DB","type":"postgresql"}]`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer core.Close()
+	handler, err := New(coreclient.New(core.URL, core.Client()), "test")
+	if err != nil { t.Fatal(err) }
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	if rec.Code != http.StatusOK { t.Fatalf("status = %d", rec.Code) }
+	body := rec.Body.String()
+	for _, hook := range []string{
+		`id="manage-app"`, `id="instance-summary"`, `id="module-panel"`,
+		`id="resource-panel"`, `id="core-connection-status"`,
+		`class="mf-stat"`, `class="mf-list-item__name"`,
+		`data-module-id="sample-module"`, `data-resource-id="sample-db"`,
+	} {
+		if !strings.Contains(body, hook) { t.Errorf("missing DOM hook %s", hook) }
+	}
+	if strings.Contains(body, `id="module-rebuild"`) || strings.Contains(body, `class="mf-button--danger"`) {
+		t.Fatal("read-only Manage Web must not expose fake privileged actions")
+	}
+}
+
+func TestActionStylesRemainExternal(t *testing.T) {
+	handler, err := New(coreclient.New("http://127.0.0.1:1", nil), "test")
+	if err != nil { t.Fatal(err) }
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/static/app.css", nil))
+	if rec.Code != http.StatusOK { t.Fatalf("CSS status = %d", rec.Code) }
+	for _, name := range []string{".mf-button", ".mf-button--danger", ".mf-stat__label", ".mf-list-item__name"} {
+		if !strings.Contains(rec.Body.String(), name) { t.Errorf("missing CSS hook %s", name) }
+	}
+}
