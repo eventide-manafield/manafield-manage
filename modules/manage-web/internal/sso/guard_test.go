@@ -135,8 +135,8 @@ func TestForgedCallbackAndLogoutCSRF(t *testing.T) {
 	opaque.Header.Set("Sec-Fetch-Site", "same-origin")
 	accepted := httptest.NewRecorder()
 	h.ServeHTTP(accepted, opaque)
-	if accepted.Code != 303 {
-		t.Fatalf("same-origin opaque browser logout denied: %d", accepted.Code)
+	if accepted.Code != http.StatusUnauthorized {
+		t.Fatalf("expected missing-session response, got %d", accepted.Code)
 	}
 }
 
@@ -145,6 +145,7 @@ func TestMissingSSOConfigFailsClosed(t *testing.T) {
 		"MANAFIELD_MANAGE_SSO_AUTHORIZATION_URL",
 		"MANAFIELD_MANAGE_SSO_TOKEN_URL",
 		"MANAFIELD_MANAGE_SSO_USERINFO_URL",
+		"MANAFIELD_MANAGE_SSO_END_SESSION_URL",
 		"MANAFIELD_MANAGE_SSO_CLIENT_ID",
 		"MANAFIELD_MANAGE_SSO_REDIRECT_URL",
 	} {
@@ -156,6 +157,7 @@ func TestMissingSSOConfigFailsClosed(t *testing.T) {
 	t.Setenv("MANAFIELD_MANAGE_SSO_AUTHORIZATION_URL", "https://manafield.studio/account/oauth/authorize")
 	t.Setenv("MANAFIELD_MANAGE_SSO_TOKEN_URL", "http://module-manafield-account-core:8080/account/oauth/token")
 	t.Setenv("MANAFIELD_MANAGE_SSO_USERINFO_URL", "http://module-manafield-account-core:8080/account/oauth/userinfo")
+	t.Setenv("MANAFIELD_MANAGE_SSO_END_SESSION_URL", "http://module-manafield-account-core:8080/account/oauth/end-session")
 	t.Setenv("MANAFIELD_MANAGE_SSO_CLIENT_ID", "manafield-manage-web")
 	t.Setenv("MANAFIELD_MANAGE_SSO_REDIRECT_URL", "https://manage.manafield.studio/auth/callback")
 	if _, err := ConfigFromEnv(); err != nil {
@@ -164,11 +166,24 @@ func TestMissingSSOConfigFailsClosed(t *testing.T) {
 }
 
 func TestLogoutDoesNotSilentlyRestartAccountSSO(t *testing.T) {
+	revokes := 0
+	issuer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/end-session" ||
+			r.Header.Get("Authorization") != "Bearer "+strings.Repeat("t", 43) {
+			t.Errorf("invalid central logout request: %s %s", r.Method, r.URL.Path)
+			http.Error(w, "bad request", 400)
+			return
+		}
+		revokes++
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer issuer.Close()
 	g := New(Config{
 		AuthorizationURL: "https://account.test/account/oauth/authorize",
+		EndSessionURL:    issuer.URL+"/end-session",
 		ClientID:         "manage",
 		RedirectURL:      "https://manage.test/auth/callback",
-	}, nil)
+	}, issuer.Client())
 	h := g.Wrap(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte("PRIVATE_CONTENT"))
 	}))
@@ -184,8 +199,8 @@ func TestLogoutDoesNotSilentlyRestartAccountSSO(t *testing.T) {
 	if result.Code != http.StatusSeeOther || result.Header().Get("Location") != "/auth/logged-out" {
 		t.Fatalf("logout must end on a stable page, got %d %q", result.Code, result.Header().Get("Location"))
 	}
-	if len(g.sessions) != 0 {
-		t.Fatal("Manage session was not revoked server-side")
+	if len(g.sessions) != 0 || revokes != 1 {
+		t.Fatalf("central/Manage revocation incorrect, local=%d central=%d", len(g.sessions), revokes)
 	}
 	// Even a residual session must never bypass the explicit signed-out hold.
 	g.sessions[digest(secret)] = session{Token: strings.Repeat("t", 43), Until: time.Now().Add(time.Minute)}
@@ -238,7 +253,15 @@ func TestLogoutDoesNotSilentlyRestartAccountSSO(t *testing.T) {
 }
 
 func TestLogoutOriginValidationForBrowserForms(t *testing.T) {
-	g := New(Config{RedirectURL: "https://manage.test/auth/callback"}, nil)
+	issuer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.Header.Get("Authorization") != "Bearer "+strings.Repeat("t",43) {
+			http.Error(w, "unauthorized", 401)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer issuer.Close()
+	g := New(Config{RedirectURL: "https://manage.test/auth/callback", EndSessionURL: issuer.URL}, issuer.Client())
 	h := g.Wrap(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }))
 	for _, tc := range []struct {
 		name, origin, fetchSite string
@@ -253,7 +276,12 @@ func TestLogoutOriginValidationForBrowserForms(t *testing.T) {
 		{"unverified-missing-origin", "", "", http.StatusForbidden},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			secret := strings.Repeat("s",43)
+			g.mu.Lock()
+			g.sessions[digest(secret)] = session{Token:strings.Repeat("t",43), Until:time.Now().Add(time.Minute)}
+			g.mu.Unlock()
 			req := httptest.NewRequest(http.MethodPost, "https://manage.test/auth/logout", nil)
+			req.AddCookie(&http.Cookie{Name:sessionCookie, Value:secret})
 			if tc.origin != "" {
 				req.Header.Set("Origin", tc.origin)
 			}
@@ -266,5 +294,29 @@ func TestLogoutOriginValidationForBrowserForms(t *testing.T) {
 				t.Fatalf("logout %d, want %d", result.Code, tc.status)
 			}
 		})
+	}
+}
+
+func TestCentralLogoutFailureDoesNotClaimSuccess(t *testing.T) {
+	issuer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "account core unavailable", http.StatusServiceUnavailable)
+	}))
+	defer issuer.Close()
+	g := New(Config{RedirectURL:"https://manage.test/auth/callback", EndSessionURL:issuer.URL}, issuer.Client())
+	secret := strings.Repeat("s",43)
+	g.sessions[digest(secret)] = session{Token:strings.Repeat("t",43), Until:time.Now().Add(time.Minute)}
+	h := g.Wrap(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {w.WriteHeader(http.StatusOK)}))
+	req := httptest.NewRequest(http.MethodPost, "https://manage.test/auth/logout", nil)
+	req.Header.Set("Origin","https://manage.test")
+	req.AddCookie(&http.Cookie{Name:sessionCookie,Value:secret})
+	out := httptest.NewRecorder()
+	h.ServeHTTP(out,req)
+	if out.Code!=http.StatusBadGateway || len(g.sessions)!=1 {
+		t.Fatalf("failed central revoke must retain local session: HTTP %d, sessions %d", out.Code,len(g.sessions))
+	}
+	for _,cookie := range out.Result().Cookies() {
+		if cookie.Name==signedOutCookie && cookie.Value=="1" {
+			t.Fatal("central logout failure marked browser signed out")
+		}
 	}
 }
