@@ -25,7 +25,7 @@
       <span class="mf-header__version">manage {{.Version}}</span>
     </header>
 
-    <section class="mf-hero mf-hero--compact">
+    <section class="mf-hero mf-hero--compact" id="manage-introduction">
       <p class="mf-eyebrow">INSTANCE CONTROL SURFACE</p>
       <h1>Manafield Manage</h1>
       <p class="mf-lead">
@@ -35,25 +35,25 @@
     </section>
 
     <section class="mf-stats" id="instance-summary" aria-label="Instance snapshot">
-      <article>
-        <span>CORE</span>
-        <strong>{{if .CoreAvailable}}Connected{{else}}Unavailable{{end}}</strong>
-        <small>{{if .CoreAvailable}}Core API online{{else}}Manage is running in degraded mode{{end}}</small>
+      <article class="mf-stat" id="stat-core">
+        <span class="mf-stat__label">CORE</span>
+        <strong class="mf-stat__value">{{if .CoreAvailable}}Connected{{else}}Unavailable{{end}}</strong>
+        <small class="mf-stat__detail">{{if .CoreAvailable}}Core API online{{else}}Manage is running in degraded mode{{end}}</small>
       </article>
-      <article>
-        <span>MODULES</span>
-        <strong>{{.ModuleCount}}</strong>
-        <small>registered modules</small>
+      <article class="mf-stat" id="stat-modules">
+        <span class="mf-stat__label">MODULES</span>
+        <strong class="mf-stat__value">{{.ModuleCount}}</strong>
+        <small class="mf-stat__detail">registered modules</small>
       </article>
-      <article>
-        <span>RESOURCES</span>
-        <strong>{{.ResourceCount}}</strong>
-        <small>registered resources</small>
+      <article class="mf-stat" id="stat-resources">
+        <span class="mf-stat__label">RESOURCES</span>
+        <strong class="mf-stat__value">{{.ResourceCount}}</strong>
+        <small class="mf-stat__detail">registered resources</small>
       </article>
-      <article>
-        <span>CAPABILITIES</span>
-        <strong>{{.CapabilityCount}}</strong>
-        <small>declared contracts</small>
+      <article class="mf-stat" id="stat-capabilities">
+        <span class="mf-stat__label">CAPABILITIES</span>
+        <strong class="mf-stat__value">{{.CapabilityCount}}</strong>
+        <small class="mf-stat__detail">declared contracts</small>
       </article>
     </section>
 
@@ -80,10 +80,10 @@
             {{range .Modules}}
               <article class="mf-list-item" data-module-id="{{.ID}}">
                 <div>
-                  <strong>{{.Name}}</strong>
-                  <small>{{.ID}}</small>
+                  <strong class="mf-list-item__name">{{.Name}}</strong>
+                  <small class="mf-list-item__meta">{{.ID}}</small>
                 </div>
-                <span>v{{.Version}}</span>
+                <span class="mf-list-item__version">v{{.Version}}</span>
               </article>
             {{end}}
           {{end}}
@@ -100,12 +100,12 @@
             {{range .Resources}}
               <article class="mf-list-item mf-list-item--resource" data-resource-id="{{.ID}}">
                 <div>
-                  <strong>{{.Name}}</strong>
-                  <small>{{.ID}} · {{.Type}}</small>
+                  <strong class="mf-list-item__name">{{.Name}}</strong>
+                  <small class="mf-list-item__meta">{{.ID}} · {{.Type}}</small>
                 </div>
                 <div class="mf-capability-list">
                   {{range .Provides.Capabilities}}
-                    <span>{{.ID}} @ {{.Version}}</span>
+                    <span class="mf-capability">{{.ID}} @ {{.Version}}</span>
                   {{end}}
                 </div>
               </article>
