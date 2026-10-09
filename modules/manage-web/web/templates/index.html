@@ -63,7 +63,7 @@
           <p class="mf-eyebrow">CURRENT INSTANCE</p>
           <h2>연결 상태</h2>
         </div>
-        <span id="core-connection-status" class="mf-status {{if .CoreAvailable}}ok{{else}}degraded{{end}}">
+        <span id="core-connection-status" class="mf-status {{if .CoreAvailable}}mf-status--ok{{else}}mf-status--degraded{{end}}">
           {{if .CoreAvailable}}Registry connected{{else}}Registry unavailable{{end}}
         </span>
       </div>
