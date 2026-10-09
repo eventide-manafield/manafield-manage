@@ -100,10 +100,17 @@ func (g *Guard) Wrap(next http.Handler) http.Handler {
 		case "/auth/logout":
 			g.logout(w, r)
 			return
+		case "/auth/logged-out":
+			g.loggedOut(w, r)
+			return
 		}
 		if err := g.authenticate(r); err != nil {
 			if errors.Is(err, errUnauthenticated) {
 				if r.Method == "GET" || r.Method == "HEAD" {
+					if isSignedOut(r) {
+						http.Redirect(w, r, "/auth/logged-out", http.StatusSeeOther)
+						return
+					}
 					http.Redirect(w, r, "/auth/login", 303)
 				} else {
 					http.Error(w, "unauthorized", 401)
@@ -124,6 +131,8 @@ func (g *Guard) login(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", 405)
 		return
 	}
+	// A fresh, explicit login is the only action that lifts a local logout hold.
+	clearSignedOut(w)
 	state, err := random()
 	if err != nil {
 		http.Error(w, "SSO unavailable", 503)
@@ -168,6 +177,10 @@ func (g *Guard) login(w http.ResponseWriter, r *http.Request) {
 func (g *Guard) callback(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
 		http.Error(w, "method not allowed", 405)
+		return
+	}
+	if isSignedOut(r) {
+		http.Error(w, "sign-in must be explicitly restarted", http.StatusForbidden)
 		return
 	}
 	state := r.URL.Query().Get("state")
@@ -284,15 +297,18 @@ func (g *Guard) authenticate(r *http.Request) error {
 	return g.userInfo(r.Context(), s.Token)
 }
 func (g *Guard) logout(w http.ResponseWriter, r *http.Request) {
-	if r.Method != "POST" {
-		http.Error(w, "method not allowed", 405)
+	if r.Method != http.MethodPost {
+		w.Header().Set("Allow", "POST")
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	sentOrigin := r.Header.Get("Origin")
 	fetchSite := r.Header.Get("Sec-Fetch-Site")
+	// Some browsers omit Origin, or send an opaque Origin for same-origin forms.
+	// Fetch Metadata must explicitly assert same-origin in those cases.
 	if fetchSite == "cross-site" || !(sentOrigin == origin(g.cfg.RedirectURL) ||
-		(sentOrigin == "null" && fetchSite == "same-origin")) {
-		http.Error(w, "forbidden", 403)
+		((sentOrigin == "" || sentOrigin == "null") && fetchSite == "same-origin")) {
+		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
 	if cookie, err := r.Cookie(sessionCookie); err == nil {
@@ -300,8 +316,17 @@ func (g *Guard) logout(w http.ResponseWriter, r *http.Request) {
 		delete(g.sessions, digest(cookie.Value))
 		g.mu.Unlock()
 	}
+	if cookie, err := r.Cookie(flowCookie); err == nil {
+		g.mu.Lock()
+		delete(g.flows, cookie.Value)
+		g.mu.Unlock()
+	}
 	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Path: "/", Secure: true, HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: -1})
-	http.Redirect(w, r, "/auth/login", 303)
+	http.SetCookie(w, &http.Cookie{Name: flowCookie, Path: "/", Secure: true, HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: -1})
+	markSignedOut(w)
+	// Do NOT redirect to /auth/login: the independent Account Core session
+	// would silently issue a fresh code, making logout look ineffective.
+	http.Redirect(w, r, "/auth/logged-out", http.StatusSeeOther)
 }
 func origin(raw string) string {
 	u, _ := url.Parse(raw)
