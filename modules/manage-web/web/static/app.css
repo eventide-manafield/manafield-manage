@@ -156,3 +156,6 @@ h1, h2, h3 { line-height: 1.3; font-weight: 600; }
   .mf-requirement__details { grid-template-columns: 1fr; gap: 3px; }
   .mf-requirement__details dd { margin-bottom: 8px; }
 }
+
+.mf-header__controls { display: flex; gap: 12px; align-items: center; }
+.mf-header__controls form { margin: 0; }
