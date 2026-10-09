@@ -25,6 +25,7 @@ type Server struct {
 	static        http.Handler
 	customCSSFile string
 	bindingsFile  string
+	audit         *auditService
 }
 
 type pageData struct {
@@ -44,7 +45,7 @@ func New(core *coreclient.Client, version string) (http.Handler, error) {
 		return nil, fmt.Errorf("Core client is required")
 	}
 
-	tmpl, err := template.ParseFS(webassets.FS, "templates/index.html", "templates/module.html")
+	tmpl, err := template.ParseFS(webassets.FS, "templates/index.html", "templates/module.html", "templates/security.html")
 	if err != nil {
 		return nil, fmt.Errorf("parse templates: %w", err)
 	}
@@ -66,6 +67,7 @@ func New(core *coreclient.Client, version string) (http.Handler, error) {
 		static:        http.FileServer(http.FS(staticFS)),
 		customCSSFile: customCSSFile,
 		bindingsFile:  strings.TrimSpace(os.Getenv("MANAFIELD_MANAGE_BINDINGS_FILE")),
+		audit:         auditServiceFromEnv(),
 	}
 
 	mux := http.NewServeMux()
@@ -73,6 +75,7 @@ func New(core *coreclient.Client, version string) (http.Handler, error) {
 	mux.Handle("/static/", http.StripPrefix("/static/", server.static))
 	mux.HandleFunc("/manafield/health", server.health)
 	mux.HandleFunc("GET /modules/{id}", server.modulePage)
+	mux.HandleFunc("/security/login-history", server.securityLoginHistory)
 	mux.HandleFunc("/", server.home)
 
 	return mux, nil
