@@ -117,3 +117,24 @@ MANAFIELD_MANAGE_BINDINGS_FILE=/run/manafield/manage/bindings.json
 ## License
 
 라이선스 선정 전입니다. **공개 저장소라는 사실 자체가 사용·수정·재배포 허락을 의미하지는 않습니다.**
+
+## Manage SSO login
+
+The `manage-web` binary **refuses to serve without SSO configuration**. The production HTTP handler protects the homepage, module detail pages, built-in CSS, private override CSS, and all future routes by default, except the minimal `/manafield/health` endpoint.
+
+This release implements OAuth 2.0 authorization code + PKCE S256 against Manafield Account Core:
+
+```text
+MANAFIELD_MANAGE_SSO_AUTHORIZATION_URL=https://manafield.studio/account/oauth/authorize
+MANAFIELD_MANAGE_SSO_TOKEN_URL=http://module-manafield-account-core:8080/account/oauth/token
+MANAFIELD_MANAGE_SSO_USERINFO_URL=http://module-manafield-account-core:8080/account/oauth/userinfo
+MANAFIELD_MANAGE_SSO_CLIENT_ID=manafield-manage-web
+MANAFIELD_MANAGE_SSO_REDIRECT_URL=https://manage.manafield.studio/auth/callback
+```
+
+The public authorization URL is used only in a browser redirect; token exchange and userinfo checks run server-side on the Manafield modules network. SSO client registration on Account Core must permit the **exact** callback URL above.
+
+Manage issues its own `__Host-mf_manage_session` Secure/HttpOnly/SameSite=Lax host-only cookie. This holds a random session ID only: Account Core Bearer tokens are kept in the Manage server process memory. Every protected request verifies the identity's active status through Account Core userinfo. Manage sessions have a maximum lifetime of 15 minutes; process restart invalidates outstanding sessions. Login and logout do not expose Account Core's browser cookie to Manage.
+
+**SSO is authentication, not authorization.** The current Manage UI remains read-only, and a logged-in account has not yet been checked for a particular Role. Do not enable mutating management operations until the Account Role Permission check is implemented. The current integration is a first-party OAuth/PKCE subset, not full OIDC; OIDC Discovery, ID Tokens and JWKS remain future work.
+
