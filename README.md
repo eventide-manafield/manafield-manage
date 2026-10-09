@@ -84,8 +84,8 @@ Manage Web의 모듈 목록은 Core Registry에 등록된 `requires.capabilities
 ```json
 {
   "modules": {
-    "manafield-account-core": {
-      "state": "manafield-postgres"
+    "example-module": {
+      "state": "main-postgres"
     }
   }
 }
