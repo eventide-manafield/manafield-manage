@@ -187,6 +187,8 @@ func TestLogoutDoesNotSilentlyRestartAccountSSO(t *testing.T) {
 	if len(g.sessions) != 0 {
 		t.Fatal("Manage session was not revoked server-side")
 	}
+	// Even a residual session must never bypass the explicit signed-out hold.
+	g.sessions[digest(secret)] = session{Token: strings.Repeat("t", 43), Until: time.Now().Add(time.Minute)}
 
 	var hold *http.Cookie
 	var erased bool
