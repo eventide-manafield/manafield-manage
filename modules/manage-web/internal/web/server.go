@@ -8,10 +8,10 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
-	"os"
-	"strings"
-	"sort"
 	"net/url"
+	"os"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/eventide-manafield/manafield-manage/modules/manage-web/internal/coreclient"
@@ -19,12 +19,12 @@ import (
 )
 
 type Server struct {
-	core     *coreclient.Client
-	version  string
-	template *template.Template
-	static   http.Handler
+	core          *coreclient.Client
+	version       string
+	template      *template.Template
+	static        http.Handler
 	customCSSFile string
-	bindingsFile string
+	bindingsFile  string
 }
 
 type pageData struct {
@@ -60,12 +60,12 @@ func New(core *coreclient.Client, version string) (http.Handler, error) {
 	}
 
 	server := &Server{
-		core:     core,
-		version:  version,
-		template: tmpl,
-		static:   http.FileServer(http.FS(staticFS)),
+		core:          core,
+		version:       version,
+		template:      tmpl,
+		static:        http.FileServer(http.FS(staticFS)),
 		customCSSFile: customCSSFile,
-		bindingsFile: strings.TrimSpace(os.Getenv("MANAFIELD_MANAGE_BINDINGS_FILE")),
+		bindingsFile:  strings.TrimSpace(os.Getenv("MANAFIELD_MANAGE_BINDINGS_FILE")),
 	}
 
 	mux := http.NewServeMux()
@@ -170,10 +170,10 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 }
 
 type modulePageData struct {
-	Version    string
-	CustomCSS  bool
-	Detail     moduleDetail
-	BackURL    string
+	Version       string
+	CustomCSS     bool
+	Detail        moduleDetail
+	BackURL       string
 	SnapshotError bool
 }
 
