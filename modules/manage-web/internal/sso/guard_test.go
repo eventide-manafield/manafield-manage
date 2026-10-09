@@ -180,7 +180,7 @@ func TestLogoutDoesNotSilentlyRestartAccountSSO(t *testing.T) {
 	defer issuer.Close()
 	g := New(Config{
 		AuthorizationURL: "https://account.test/account/oauth/authorize",
-		EndSessionURL:    issuer.URL+"/end-session",
+		EndSessionURL:    issuer.URL + "/end-session",
 		ClientID:         "manage",
 		RedirectURL:      "https://manage.test/auth/callback",
 	}, issuer.Client())
@@ -254,7 +254,7 @@ func TestLogoutDoesNotSilentlyRestartAccountSSO(t *testing.T) {
 
 func TestLogoutOriginValidationForBrowserForms(t *testing.T) {
 	issuer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost || r.Header.Get("Authorization") != "Bearer "+strings.Repeat("t",43) {
+		if r.Method != http.MethodPost || r.Header.Get("Authorization") != "Bearer "+strings.Repeat("t", 43) {
 			http.Error(w, "unauthorized", 401)
 			return
 		}
@@ -276,12 +276,12 @@ func TestLogoutOriginValidationForBrowserForms(t *testing.T) {
 		{"unverified-missing-origin", "", "", http.StatusForbidden},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			secret := strings.Repeat("s",43)
+			secret := strings.Repeat("s", 43)
 			g.mu.Lock()
-			g.sessions[digest(secret)] = session{Token:strings.Repeat("t",43), Until:time.Now().Add(time.Minute)}
+			g.sessions[digest(secret)] = session{Token: strings.Repeat("t", 43), Until: time.Now().Add(time.Minute)}
 			g.mu.Unlock()
 			req := httptest.NewRequest(http.MethodPost, "https://manage.test/auth/logout", nil)
-			req.AddCookie(&http.Cookie{Name:sessionCookie, Value:secret})
+			req.AddCookie(&http.Cookie{Name: sessionCookie, Value: secret})
 			if tc.origin != "" {
 				req.Header.Set("Origin", tc.origin)
 			}
@@ -302,20 +302,20 @@ func TestCentralLogoutFailureDoesNotClaimSuccess(t *testing.T) {
 		http.Error(w, "account core unavailable", http.StatusServiceUnavailable)
 	}))
 	defer issuer.Close()
-	g := New(Config{RedirectURL:"https://manage.test/auth/callback", EndSessionURL:issuer.URL}, issuer.Client())
-	secret := strings.Repeat("s",43)
-	g.sessions[digest(secret)] = session{Token:strings.Repeat("t",43), Until:time.Now().Add(time.Minute)}
-	h := g.Wrap(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {w.WriteHeader(http.StatusOK)}))
+	g := New(Config{RedirectURL: "https://manage.test/auth/callback", EndSessionURL: issuer.URL}, issuer.Client())
+	secret := strings.Repeat("s", 43)
+	g.sessions[digest(secret)] = session{Token: strings.Repeat("t", 43), Until: time.Now().Add(time.Minute)}
+	h := g.Wrap(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.WriteHeader(http.StatusOK) }))
 	req := httptest.NewRequest(http.MethodPost, "https://manage.test/auth/logout", nil)
-	req.Header.Set("Origin","https://manage.test")
-	req.AddCookie(&http.Cookie{Name:sessionCookie,Value:secret})
+	req.Header.Set("Origin", "https://manage.test")
+	req.AddCookie(&http.Cookie{Name: sessionCookie, Value: secret})
 	out := httptest.NewRecorder()
-	h.ServeHTTP(out,req)
-	if out.Code!=http.StatusBadGateway || len(g.sessions)!=1 {
-		t.Fatalf("failed central revoke must retain local session: HTTP %d, sessions %d", out.Code,len(g.sessions))
+	h.ServeHTTP(out, req)
+	if out.Code != http.StatusBadGateway || len(g.sessions) != 1 {
+		t.Fatalf("failed central revoke must retain local session: HTTP %d, sessions %d", out.Code, len(g.sessions))
 	}
-	for _,cookie := range out.Result().Cookies() {
-		if cookie.Name==signedOutCookie && cookie.Value=="1" {
+	for _, cookie := range out.Result().Cookies() {
+		if cookie.Name == signedOutCookie && cookie.Value == "1" {
 			t.Fatal("central logout failure marked browser signed out")
 		}
 	}
