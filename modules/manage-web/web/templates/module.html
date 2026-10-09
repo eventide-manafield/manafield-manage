@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>{{.Detail.Module.Name}} · Manafield Manage</title>
+  <link rel="stylesheet" href="/static/app.css">
+  {{if .CustomCSS}}<link rel="stylesheet" href="/static/custom.css">{{end}}
+</head>
+<body>
+  <main class="mf-layout" id="manage-app">
+    <header class="mf-header">
+      <a class="mf-brand" id="manage-home-link" href="/">Manafield <small>Manage</small></a>
+      <span class="mf-header__version">manage {{.Version}}</span>
+    </header>
+
+    <nav class="mf-breadcrumb" aria-label="위치">
+      <a href="/">Modules</a> / <span>{{.Detail.Module.ID}}</span>
+    </nav>
+    <section class="mf-hero mf-hero--compact" id="module-detail">
+      <p class="mf-eyebrow">MODULE DETAILS</p>
+      <h1>{{.Detail.Module.Name}}</h1>
+      <p class="mf-list-item__meta" id="module-id">{{.Detail.Module.ID}} · v{{.Detail.Module.Version}}</p>
+      <div class="mf-detail-summary">
+        <p><strong>전체 요구사항 : {{len .Detail.Requirements}}개</strong> (필수 {{.Detail.RequiredCount}}개 / 선택 {{.Detail.OptionalCount}}개)</p>
+        <p>필수 바인딩 : {{if or .Detail.BindingsKnown (eq .Detail.RequiredCount 0)}}{{.Detail.RequiredBound}}/{{.Detail.RequiredCount}}{{else}}확인 불가{{end}}</p>
+        {{if .Detail.Warnings}}<p class="mf-warning-text" role="status">⚠ {{range $i, $w := .Detail.Warnings}}{{if $i}} · {{end}}{{$w}}{{end}}</p>{{end}}
+        {{if .SnapshotError}}<p class="mf-info" role="status">바인딩 스냅샷을 읽지 못했어. 연결 여부는 현재 확인할 수 없어.</p>{{else if not .Detail.BindingsKnown}}<p class="mf-info">바인딩 데이터가 연결되지 않았어. Core Registry에는 요구사항만 기록돼 있어.</p>{{end}}
+      </div>
+    </section>
+
+    <section class="mf-section" id="module-requirements">
+      <div class="mf-section__header">
+        <h2>요구사항 상세</h2>
+        <span class="mf-status">{{len .Detail.Requirements}} total</span>
+      </div>
+      {{if not .Detail.Requirements}}
+        <p class="mf-empty">선언된 요구사항이 없어.</p>
+      {{else}}
+        <div class="mf-requirement-list">
+          {{range .Detail.Requirements}}
+            <article class="mf-requirement" data-requirement-slot="{{.Slot}}">
+              <div class="mf-requirement__header">
+                <h3>{{.Slot}}</h3>
+                <span class="mf-requirement__kind">{{if .Optional}}선택{{else}}필수{{end}}</span>
+              </div>
+              <dl class="mf-requirement__details">
+                <dt>요구 Capability</dt><dd><code>{{.CapabilityID}}</code></dd>
+                <dt>필요 버전</dt><dd><code>{{.VersionRange}}</code></dd>
+                <dt>바인딩 대상</dt><dd>{{if .Bound}}<code>{{.Target}}</code>{{else}}<span class="mf-muted">미지정 / 확인 불가</span>{{end}}</dd>
+                <dt>Provider</dt><dd>{{if .ProviderKind}}{{.ProviderKind}}{{else}}<span class="mf-muted">—</span>{{end}}</dd>
+                <dt>제공 버전</dt><dd>{{if .FoundVersion}}<code>{{.FoundVersion}}</code>{{else}}—{{end}}</dd>
+                <dt>진단</dt><dd class="{{if .Warning}}mf-warning-text{{end}}">{{if .Warning}}⚠ {{end}}{{.Status}}</dd>
+              </dl>
+              {{if .Candidates}}
+                <details class="mf-candidates">
+                  <summary>Capability 제공 후보 {{len .Candidates}}개</summary>
+                  <ul>
+                    {{range .Candidates}}
+                      <li><code>{{.ID}}</code> · {{.Kind}} · v{{.Version}}</li>
+                    {{end}}
+                  </ul>
+                </details>
+              {{else}}
+                <p class="mf-muted mf-candidates">현재 Registry에 등록된 제공 후보가 없어.</p>
+              {{end}}
+            </article>
+          {{end}}
+        </div>
+      {{end}}
+    </section>
+    <footer class="mf-footer">
+      <a href="/">← 모듈 목록으로</a>
+      <span>읽기 전용 진단 · 관리 작업 없음</span>
+    </footer>
+  </main>
+</body>
+</html>
