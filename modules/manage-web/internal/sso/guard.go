@@ -26,18 +26,24 @@ type Config struct {
 	AuthorizationURL string
 	TokenURL         string
 	UserInfoURL      string
+	EndSessionURL    string
 	ClientID         string
 	RedirectURL      string
 }
 
 func ConfigFromEnv() (Config, error) {
-	c := Config{os.Getenv("MANAFIELD_MANAGE_SSO_AUTHORIZATION_URL"),
-		os.Getenv("MANAFIELD_MANAGE_SSO_TOKEN_URL"), os.Getenv("MANAFIELD_MANAGE_SSO_USERINFO_URL"),
-		os.Getenv("MANAFIELD_MANAGE_SSO_CLIENT_ID"), os.Getenv("MANAFIELD_MANAGE_SSO_REDIRECT_URL")}
+	c := Config{
+		AuthorizationURL: os.Getenv("MANAFIELD_MANAGE_SSO_AUTHORIZATION_URL"),
+		TokenURL:         os.Getenv("MANAFIELD_MANAGE_SSO_TOKEN_URL"),
+		UserInfoURL:      os.Getenv("MANAFIELD_MANAGE_SSO_USERINFO_URL"),
+		EndSessionURL:    os.Getenv("MANAFIELD_MANAGE_SSO_END_SESSION_URL"),
+		ClientID:         os.Getenv("MANAFIELD_MANAGE_SSO_CLIENT_ID"),
+		RedirectURL:      os.Getenv("MANAFIELD_MANAGE_SSO_REDIRECT_URL"),
+	}
 	if c.ClientID == "" {
 		return c, errors.New("SSO client ID not configured")
 	}
-	for _, raw := range []string{c.AuthorizationURL, c.TokenURL, c.UserInfoURL, c.RedirectURL} {
+	for _, raw := range []string{c.AuthorizationURL, c.TokenURL, c.UserInfoURL, c.EndSessionURL, c.RedirectURL} {
 		parsed, err := url.Parse(raw)
 		if err != nil || parsed.Host == "" || parsed.User != nil || parsed.Fragment != "" ||
 			(parsed.Scheme != "http" && parsed.Scheme != "https") {
