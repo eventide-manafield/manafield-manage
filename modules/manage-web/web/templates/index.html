@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="description" content="Manafield instance management and observation">
+  <title>Manafield Manage</title>
+  <link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+  <div class="sky" aria-hidden="true"></div>
+
+  <main class="shell">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Manafield home">
+        <span class="brand-mark">M</span>
+        <span>
+          <strong>Manafield</strong>
+          <small>Manage</small>
+        </span>
+      </a>
+
+      <span class="version">manage {{.Version}}</span>
+    </header>
+
+    <section class="hero compact">
+      <p class="eyebrow">INSTANCE CONTROL SURFACE</p>
+      <h1>Manafield Manage</h1>
+      <p class="lead">
+        현재 Instance가 알고 있는 Module, Resource와 Capability를 관측하는 관리 화면.
+        변경 기능은 Core의 lifecycle / binding API가 준비되는 만큼 단계적으로 추가해.
+      </p>
+    </section>
+
+    <section class="snapshot" aria-label="Instance snapshot">
+      <article>
+        <span>CORE</span>
+        <strong>{{if .CoreAvailable}}Connected{{else}}Unavailable{{end}}</strong>
+        <small>{{if .CoreAvailable}}Core API online{{else}}Manage is running in degraded mode{{end}}</small>
+      </article>
+      <article>
+        <span>MODULES</span>
+        <strong>{{.ModuleCount}}</strong>
+        <small>registered modules</small>
+      </article>
+      <article>
+        <span>RESOURCES</span>
+        <strong>{{.ResourceCount}}</strong>
+        <small>registered resources</small>
+      </article>
+      <article>
+        <span>CAPABILITIES</span>
+        <strong>{{.CapabilityCount}}</strong>
+        <small>declared contracts</small>
+      </article>
+    </section>
+
+    <section class="instance">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">CURRENT INSTANCE</p>
+          <h2>연결 상태</h2>
+        </div>
+        <span class="status {{if .CoreAvailable}}ok{{else}}degraded{{end}}">
+          {{if .CoreAvailable}}Registry connected{{else}}Registry unavailable{{end}}
+        </span>
+      </div>
+
+      <div class="columns">
+        <section class="panel">
+          <div class="panel-title">
+            <h3>Modules</h3>
+            <span>{{.ModuleCount}}</span>
+          </div>
+          {{if eq .ModuleCount 0}}
+            <p class="empty">등록된 Module이 없어.</p>
+          {{else}}
+            {{range .Modules}}
+              <article class="item">
+                <div>
+                  <strong>{{.Name}}</strong>
+                  <small>{{.ID}}</small>
+                </div>
+                <span>v{{.Version}}</span>
+              </article>
+            {{end}}
+          {{end}}
+        </section>
+
+        <section class="panel">
+          <div class="panel-title">
+            <h3>Resources</h3>
+            <span>{{.ResourceCount}}</span>
+          </div>
+          {{if eq .ResourceCount 0}}
+            <p class="empty">등록된 Resource가 없어.</p>
+          {{else}}
+            {{range .Resources}}
+              <article class="item resource">
+                <div>
+                  <strong>{{.Name}}</strong>
+                  <small>{{.ID}} · {{.Type}}</small>
+                </div>
+                <div class="caps">
+                  {{range .Provides.Capabilities}}
+                    <span>{{.ID}} @ {{.Version}}</span>
+                  {{end}}
+                </div>
+              </article>
+            {{end}}
+          {{end}}
+        </section>
+      </div>
+    </section>
+
+    <footer>
+      <span>MANAFIELD / MANAGE MODULE</span>
+      <span>Observation first · mutation later</span>
+    </footer>
+  </main>
+</body>
+</html>

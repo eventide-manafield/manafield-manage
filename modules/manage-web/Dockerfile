@@ -6,7 +6,7 @@ COPY cmd ./cmd
 COPY internal ./internal
 COPY web ./web
 
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/manafield-manage-web-web ./cmd/manafield-manage-web-web
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/manafield-manage-web ./cmd/manafield-manage-web
 
 FROM scratch
 
