@@ -7,7 +7,6 @@ import (
  "encoding/base64"
  "encoding/json"
  "errors"
- "fmt"
  "io"
  "net/http"
  "net/url"
@@ -97,8 +96,6 @@ func (g *Guard) login(w http.ResponseWriter,r *http.Request){
  if len(g.flows)>=1024 {g.mu.Unlock();http.Error(w,"SSO temporarily busy",503);return}
  g.flows[state]=flow{verifier,now.Add(5*time.Minute)}
  g.mu.Unlock()
- challenge:=base64.RawURLEncoding.EncodeToString(digest(verifier)[:])
- _=challenge
  u,err:=url.Parse(g.cfg.AuthorizationURL)
  if err!=nil{http.Error(w,"SSO config unavailable",503);return}
  q:=u.Query()
@@ -186,4 +183,3 @@ func (g *Guard) logout(w http.ResponseWriter,r *http.Request){
  http.Redirect(w,r,"/auth/login",303)
 }
 func origin(raw string)string{u,_:=url.Parse(raw);if u==nil{return ""};return u.Scheme+"://"+u.Host}
-var _=fmt.Sprintf
