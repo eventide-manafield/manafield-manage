@@ -16,6 +16,35 @@ html, body { min-height: 100%; }
 body { margin: 0; background: var(--page-bg); color: var(--page-text); }
 a { color: inherit; text-decoration: underline; text-underline-offset: 3px; }
 a:hover { text-decoration-thickness: 2px; }
+/* Neutral controls for future lifecycle actions (no action buttons are wired yet). */
+button, .button, input[type="button"], input[type="submit"] {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--page-border);
+  border-radius: 6px;
+  padding: 7px 12px;
+  background: var(--page-bg);
+  color: var(--page-text);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.4;
+  text-decoration: none;
+  cursor: pointer;
+}
+button:hover, .button:hover, input[type="button"]:hover, input[type="submit"]:hover {
+  background: var(--page-subtle);
+}
+button:focus-visible, .button:focus-visible, input[type="button"]:focus-visible, input[type="submit"]:focus-visible {
+  outline: 2px solid var(--page-text);
+  outline-offset: 2px;
+}
+button:disabled, .button[aria-disabled="true"], input:disabled {
+  opacity: .5;
+  cursor: not-allowed;
+}
 .sky { display: none; }
 .shell { width: min(960px, calc(100% - 40px)); margin: 0 auto; }
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 20px 0; border-bottom: 1px solid var(--page-border); }
