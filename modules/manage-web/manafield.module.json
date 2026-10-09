@@ -1,0 +1,29 @@
+{
+  "id": "manafield-manage-web",
+  "name": "Manafield Manage Web",
+  "description": "Management and observation surface for a Manafield instance.",
+  "version": "0.0.1",
+  "healthOperation": "health",
+  "operations": [
+    {
+      "id": "health",
+      "description": "Reports whether the Manafield Manage Module is healthy.",
+      "input": null,
+      "output": {
+        "type": "object",
+        "required": ["status", "service", "version"],
+        "properties": {
+          "status": { "type": "string" },
+          "service": { "type": "string" },
+          "version": { "type": "string" }
+        }
+      },
+      "binding": {
+        "type": "http",
+        "method": "GET",
+        "path": "/manafield/health",
+        "codecs": ["json"]
+      }
+    }
+  ]
+}
