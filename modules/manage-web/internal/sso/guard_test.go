@@ -166,8 +166,8 @@ func TestMissingSSOConfigFailsClosed(t *testing.T) {
 func TestLogoutDoesNotSilentlyRestartAccountSSO(t *testing.T) {
 	g := New(Config{
 		AuthorizationURL: "https://account.test/account/oauth/authorize",
-		ClientID: "manage",
-		RedirectURL: "https://manage.test/auth/callback",
+		ClientID:         "manage",
+		RedirectURL:      "https://manage.test/auth/callback",
 	}, nil)
 	h := g.Wrap(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte("PRIVATE_CONTENT"))
@@ -240,7 +240,7 @@ func TestLogoutOriginValidationForBrowserForms(t *testing.T) {
 	h := g.Wrap(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }))
 	for _, tc := range []struct {
 		name, origin, fetchSite string
-		status int
+		status                  int
 	}{
 		{"same-origin", "https://manage.test", "same-origin", http.StatusSeeOther},
 		{"opaque-same-origin", "null", "same-origin", http.StatusSeeOther},
