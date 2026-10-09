@@ -29,6 +29,39 @@ go run ./cmd/manafield-manage-web
 
 `manage-web`은 **읽기 전용 상태 화면**입니다. Docker 소켓 접근이나 Jenkins 관리 권한을 요구하지 않습니다.
 
+### 공개 UI와 인스턴스별 개인 테마
+
+공개 저장소의 기본 웹 UI는 흰 배경, 진한 글자, 회색 경계선만 사용하는 **문서형·중립 디자인**입니다. 개인이 사용하는 색상, 애니메이션, 브랜드 스킨은 공개 저장소에 넣지 않습니다.
+
+로컬로 복제한 뒤 `modules/manage-web/custom.css` 파일만 추가하세요. 이 파일은 `.gitignore`로 제외되며 Go 바이너리에 포함되지 않습니다.
+
+```bash
+cd modules/manage-web
+cat > custom.css <<'CSS'
+:root {
+  --page-bg: #fafafa;
+  --page-text: #222222;
+  --page-muted: #555555;
+  --page-border: #cccccc;
+  --page-subtle: #f5f5f5;
+}
+CSS
+
+go run ./cmd/manafield-manage-web
+```
+
+서버를 켠 상태에서 `custom.css`를 수정하고 브라우저를 새로고침하면 적용됩니다. Go 리빌드나 서버 재시작은 필요하지 않습니다. 기본 스타일은 `web/static/app.css`이며, `custom.css`가 **그 뒤에 로드**되므로 CSS 변수나 선택자를 자유롭게 재정의할 수 있습니다.
+
+다른 위치의 파일을 사용하려면 `MANAFIELD_MANAGE_CUSTOM_CSS_FILE`을 지정합니다.
+
+```bash
+MANAFIELD_MANAGE_CUSTOM_CSS_FILE=/home/me/themes/manage.css go run ./cmd/manafield-manage-web
+```
+
+Docker에서는 외부 CSS 파일을 **읽기 전용 볼륨**으로 마운트하고 동일한 환경 변수를 설정하세요. 웹 앱은 `/static/custom.css`를 통해 지정된 파일만 읽어 제공합니다. **개인 테마를 담은 파일은 별도 비공개 위치에 보관**하는 게 좋습니다.
+
+> 주의: 개인 CSS를 서버에 설정하면 그 CSS는 해당 웹페이지를 방문한 브라우저에도 전달됩니다. Git 저장소에 넣지 않는 것과 웹 방문자에게 CSS를 숨기는 것은 다릅니다. 이 공개 저장소의 이전 커밋에 포함됐던 디자인 또한 Git 기록에 남아 있습니다.
+
 ## Deployment
 
 모노레포 안의 모듈을 빌드할 때에는 `modules/manage-web`을 Docker build context로 사용합니다. Git 리비전과 모듈별 빌드 경로를 릴리스 메타데이터에 각각 남기는 방식을 지향합니다.
