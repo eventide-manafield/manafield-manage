@@ -51,7 +51,7 @@ func TestPKCELoginCallbackAndRevocation(t *testing.T) {
  done:=httptest.NewRecorder();h.ServeHTTP(done,req)
  if done.Code!=303||done.Header().Get("Location")!="/"{t.Fatalf("callback %d %q",done.Code,done.Body.String())}
  var sessionCookie *http.Cookie
- for _,c:=range done.Result().Cookies(){if c.Name==sessionCookieName{sessionCookie=c}}
+ for _,c:=range done.Result().Cookies(){if c.Name==sessionCookie{sessionCookie=c}}
  if sessionCookie==nil||!sessionCookie.HttpOnly||!sessionCookie.Secure{t.Fatal("insecure session cookie")}
  private:=httptest.NewRequest("GET","https://manage.test/",nil);private.AddCookie(sessionCookie)
  got:=httptest.NewRecorder();h.ServeHTTP(got,private)
