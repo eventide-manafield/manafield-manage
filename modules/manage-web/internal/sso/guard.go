@@ -288,7 +288,10 @@ func (g *Guard) logout(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "method not allowed", 405)
 		return
 	}
-	if r.Header.Get("Origin") != origin(g.cfg.RedirectURL) {
+	sentOrigin := r.Header.Get("Origin")
+	fetchSite := r.Header.Get("Sec-Fetch-Site")
+	if fetchSite == "cross-site" || !(sentOrigin == origin(g.cfg.RedirectURL) ||
+		(sentOrigin == "null" && fetchSite == "same-origin")) {
 		http.Error(w, "forbidden", 403)
 		return
 	}
