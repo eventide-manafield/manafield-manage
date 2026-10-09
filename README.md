@@ -138,3 +138,20 @@ Manage issues its own `__Host-mf_manage_session` Secure/HttpOnly/SameSite=Lax ho
 
 **SSO is authentication, not authorization.** The current Manage UI remains read-only, and a logged-in account has not yet been checked for a particular Role. Do not enable mutating management operations until the Account Role Permission check is implemented. The current integration is a first-party OAuth/PKCE subset, not full OIDC; OIDC Discovery, ID Tokens and JWKS remain future work.
 
+
+### Manage 로그아웃 동작
+
+`POST /auth/logout`은 Manage 전용 세션과 진행 중인 PKCE flow를 해제하고,
+`/auth/logged-out` 완료 화면에 머뭅니다. Account Core는 독립적인 중앙 SSO
+세션을 유지하므로, Manage에서 즉시 `/auth/login`으로 보내면 자동 재인증되어
+로그아웃 버튼이 동작하지 않는 것처럼 보였습니다.
+
+따라서 Manage는 `__Host-mf_manage_signed_out` Secure/HttpOnly/SameSite=Lax
+쿠키로 **명시적 로그아웃 의사**를 최대 24시간 유지합니다. 로그아웃된 브라우저는
+보호된 페이지로 직접 이동해도 다시 자동 로그인하지 않으며, 사용자가
+`/auth/login`의 **다시 로그인** 링크를 클릭할 때에만 이 표시를 해제하고
+Account Core 인증 코드 교환을 시작합니다.
+
+이 동작은 **Manage 서비스에서만 로그아웃**합니다. 다른 서비스의 세션이나
+`manafield.studio`의 Account Core 세션은 로그아웃하지 않습니다.
+향후 전체 앱 로그아웃은 명시적인 별도 OIDC/OAuth 세션 종료 기능으로 구현해야 합니다.
