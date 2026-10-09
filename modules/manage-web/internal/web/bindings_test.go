@@ -14,8 +14,8 @@ func sampleModules() []coreclient.Module {
 			ID: "consumer", Name: "Consumer", Version: "1.0.0",
 			Requires: coreclient.RequirementSet{Capabilities: map[string]coreclient.Requirement{
 				"identity": {ID: "manafield.identity", Version: "^1.0.0"},
-				"state": {ID: "database.postgresql", Version: "^1.0.0"},
-				"cache": {ID: "cache.redis", Version: "^1.0.0", Optional: true},
+				"state":    {ID: "database.postgresql", Version: "^1.0.0"},
+				"cache":    {ID: "cache.redis", Version: "^1.0.0", Optional: true},
 			}},
 		},
 		{
@@ -45,7 +45,10 @@ func TestRequiredBindingTotalsAndDiagnostics(t *testing.T) {
 	}
 	var v moduleSummary
 	for _, item := range views {
-		if item.Module.ID == "consumer" { v = item; break }
+		if item.Module.ID == "consumer" {
+			v = item
+			break
+		}
 	}
 	if !v.BindingsKnown || v.RequiredTotal != 2 || v.RequiredBound != 2 {
 		t.Fatalf("wrong required binding totals: %+v", v)
@@ -101,7 +104,9 @@ func TestUnknownSnapshotIsNotMisrepresentedAsZeroBound(t *testing.T) {
 func TestBindingSnapshotIsRestrictedToPublicIdentifiers(t *testing.T) {
 	filename := filepath.Join(t.TempDir(), "bindings.json")
 	good := []byte(`{"modules":{"consumer":{"state":"main-postgres"}}}`)
-	if err := os.WriteFile(filename, good, 0600); err != nil { t.Fatal(err) }
+	if err := os.WriteFile(filename, good, 0600); err != nil {
+		t.Fatal(err)
+	}
 	snapshot, err := readBindingSnapshot(filename)
 	if err != nil || snapshot.Modules["consumer"]["state"] != "main-postgres" {
 		t.Fatalf("expected a valid projection: %v %+v", err, snapshot)
@@ -111,7 +116,9 @@ func TestBindingSnapshotIsRestrictedToPublicIdentifiers(t *testing.T) {
 		`{"modules":{"consumer":{"state":"main-postgres"}}}{}`,
 		`{"modules":null}`,
 	} {
-		if err := os.WriteFile(filename, []byte(body), 0600); err != nil { t.Fatal(err) }
+		if err := os.WriteFile(filename, []byte(body), 0600); err != nil {
+			t.Fatal(err)
+		}
 		if _, err := readBindingSnapshot(filename); err == nil {
 			t.Fatalf("should reject invalid snapshot: %s", body)
 		}
