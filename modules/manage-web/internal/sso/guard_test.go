@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestUnauthenticatedRequestsRequireLogin(t *testing.T) {
@@ -73,7 +74,15 @@ func TestPKCELoginCallbackAndRevocation(t *testing.T) {
 	if u.Query().Get("code_challenge_method") != "S256" || len(u.Query().Get("code_challenge")) != 43 {
 		t.Fatal("no PKCE S256")
 	}
-	cookie := w.Result().Cookies()[0]
+	var cookie *http.Cookie
+	for _, c := range w.Result().Cookies() {
+		if c.Name == flowCookie {
+			cookie = c
+		}
+	}
+	if cookie == nil {
+		t.Fatal("missing SSO flow cookie")
+	}
 	state := u.Query().Get("state")
 	callback := "https://manage.test/auth/callback?state=" + url.QueryEscape(state) + "&code=" + strings.Repeat("c", 43)
 	req := httptest.NewRequest("GET", callback, nil)
@@ -151,5 +160,111 @@ func TestMissingSSOConfigFailsClosed(t *testing.T) {
 	t.Setenv("MANAFIELD_MANAGE_SSO_REDIRECT_URL", "https://manage.manafield.studio/auth/callback")
 	if _, err := ConfigFromEnv(); err != nil {
 		t.Fatalf("valid first-party deployment SSO config rejected: %v", err)
+	}
+}
+
+func TestLogoutDoesNotSilentlyRestartAccountSSO(t *testing.T) {
+	g := New(Config{
+		AuthorizationURL: "https://account.test/account/oauth/authorize",
+		ClientID:         "manage",
+		RedirectURL:      "https://manage.test/auth/callback",
+	}, nil)
+	h := g.Wrap(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("PRIVATE_CONTENT"))
+	}))
+
+	secret := strings.Repeat("s", 43)
+	g.sessions[digest(secret)] = session{Token: strings.Repeat("t", 43), Until: time.Now().Add(time.Minute)}
+	req := httptest.NewRequest(http.MethodPost, "https://manage.test/auth/logout", nil)
+	req.Header.Set("Origin", "https://manage.test")
+	req.Header.Set("Sec-Fetch-Site", "same-origin")
+	req.AddCookie(&http.Cookie{Name: sessionCookie, Value: secret})
+	result := httptest.NewRecorder()
+	h.ServeHTTP(result, req)
+	if result.Code != http.StatusSeeOther || result.Header().Get("Location") != "/auth/logged-out" {
+		t.Fatalf("logout must end on a stable page, got %d %q", result.Code, result.Header().Get("Location"))
+	}
+	if len(g.sessions) != 0 {
+		t.Fatal("Manage session was not revoked server-side")
+	}
+	// Even a residual session must never bypass the explicit signed-out hold.
+	g.sessions[digest(secret)] = session{Token: strings.Repeat("t", 43), Until: time.Now().Add(time.Minute)}
+
+	var hold *http.Cookie
+	var erased bool
+	for _, cookie := range result.Result().Cookies() {
+		if cookie.Name == sessionCookie && cookie.MaxAge < 0 {
+			erased = true
+		}
+		if cookie.Name == signedOutCookie {
+			hold = cookie
+		}
+	}
+	if !erased || hold == nil || hold.Value != "1" || !hold.Secure || !hold.HttpOnly || hold.SameSite != http.SameSiteLaxMode {
+		t.Fatalf("logout cookies are incomplete: %v", result.Result().Cookies())
+	}
+	// A stale Manage cookie plus the signed-out marker must still stay logged out.
+	private := httptest.NewRequest(http.MethodGet, "https://manage.test/", nil)
+	private.AddCookie(&http.Cookie{Name: sessionCookie, Value: secret})
+	private.AddCookie(hold)
+	blocked := httptest.NewRecorder()
+	h.ServeHTTP(blocked, private)
+	if blocked.Code != http.StatusSeeOther || blocked.Header().Get("Location") != "/auth/logged-out" {
+		t.Fatalf("silent SSO restarted after logout: %d %s", blocked.Code, blocked.Header().Get("Location"))
+	}
+	landing := httptest.NewRecorder()
+	h.ServeHTTP(landing, httptest.NewRequest(http.MethodGet, "https://manage.test/auth/logged-out", nil))
+	if landing.Code != http.StatusOK || !strings.Contains(landing.Body.String(), "다시 로그인") ||
+		strings.Contains(landing.Body.String(), "PRIVATE_CONTENT") {
+		t.Fatalf("logged-out landing: %d %s", landing.Code, landing.Body.String())
+	}
+	// Explicit click on re-login is allowed to clear the hold and start PKCE.
+	login := httptest.NewRecorder()
+	logReq := httptest.NewRequest(http.MethodGet, "https://manage.test/auth/login", nil)
+	logReq.AddCookie(hold)
+	h.ServeHTTP(login, logReq)
+	if login.Code != http.StatusSeeOther || !strings.HasPrefix(login.Header().Get("Location"), g.cfg.AuthorizationURL+"?") {
+		t.Fatalf("explicit SSO login not started: %d %q", login.Code, login.Header().Get("Location"))
+	}
+	var cleared bool
+	for _, cookie := range login.Result().Cookies() {
+		if cookie.Name == signedOutCookie && cookie.MaxAge < 0 {
+			cleared = true
+		}
+	}
+	if !cleared {
+		t.Fatal("explicit login failed to clear signed-out marker")
+	}
+}
+
+func TestLogoutOriginValidationForBrowserForms(t *testing.T) {
+	g := New(Config{RedirectURL: "https://manage.test/auth/callback"}, nil)
+	h := g.Wrap(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }))
+	for _, tc := range []struct {
+		name, origin, fetchSite string
+		status                  int
+	}{
+		{"same-origin", "https://manage.test", "same-origin", http.StatusSeeOther},
+		{"opaque-same-origin", "null", "same-origin", http.StatusSeeOther},
+		{"omitted-origin-same-origin", "", "same-origin", http.StatusSeeOther},
+		{"foreign-origin-with-forged-metadata", "https://evil.test", "same-origin", http.StatusForbidden},
+		{"opaque-same-site", "null", "same-site", http.StatusForbidden},
+		{"cross-site", "https://manage.test", "cross-site", http.StatusForbidden},
+		{"unverified-missing-origin", "", "", http.StatusForbidden},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "https://manage.test/auth/logout", nil)
+			if tc.origin != "" {
+				req.Header.Set("Origin", tc.origin)
+			}
+			if tc.fetchSite != "" {
+				req.Header.Set("Sec-Fetch-Site", tc.fetchSite)
+			}
+			result := httptest.NewRecorder()
+			h.ServeHTTP(result, req)
+			if result.Code != tc.status {
+				t.Fatalf("logout %d, want %d", result.Code, tc.status)
+			}
+		})
 	}
 }
