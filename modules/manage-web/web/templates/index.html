@@ -10,31 +10,31 @@
   {{if .CustomCSS}}<link rel="stylesheet" href="/static/custom.css">{{end}}
 </head>
 <body>
-  <div class="sky" aria-hidden="true"></div>
+  <div class="mf-background" aria-hidden="true"></div>
 
-  <main class="shell">
-    <header class="topbar">
-      <a class="brand" href="/" aria-label="Manafield home">
-        <span class="brand-mark">M</span>
+  <main class="mf-layout" id="manage-app">
+    <header class="mf-header">
+      <a class="mf-brand" id="manage-home-link" href="/" aria-label="Manafield home">
+        <span class="mf-brand__mark">M</span>
         <span>
           <strong>Manafield</strong>
           <small>Manage</small>
         </span>
       </a>
 
-      <span class="version">manage {{.Version}}</span>
+      <span class="mf-header__version">manage {{.Version}}</span>
     </header>
 
-    <section class="hero compact">
-      <p class="eyebrow">INSTANCE CONTROL SURFACE</p>
+    <section class="mf-hero mf-hero--compact">
+      <p class="mf-eyebrow">INSTANCE CONTROL SURFACE</p>
       <h1>Manafield Manage</h1>
-      <p class="lead">
+      <p class="mf-lead">
         현재 Instance가 알고 있는 Module, Resource와 Capability를 관측하는 관리 화면.
         변경 기능은 Core의 lifecycle / binding API가 준비되는 만큼 단계적으로 추가해.
       </p>
     </section>
 
-    <section class="snapshot" aria-label="Instance snapshot">
+    <section class="mf-stats" id="instance-summary" aria-label="Instance snapshot">
       <article>
         <span>CORE</span>
         <strong>{{if .CoreAvailable}}Connected{{else}}Unavailable{{end}}</strong>
@@ -57,28 +57,28 @@
       </article>
     </section>
 
-    <section class="instance">
-      <div class="section-heading">
+    <section class="mf-section" id="instance-overview">
+      <div class="mf-section__header">
         <div>
-          <p class="eyebrow">CURRENT INSTANCE</p>
+          <p class="mf-eyebrow">CURRENT INSTANCE</p>
           <h2>연결 상태</h2>
         </div>
-        <span class="status {{if .CoreAvailable}}ok{{else}}degraded{{end}}">
+        <span id="core-connection-status" class="mf-status {{if .CoreAvailable}}ok{{else}}degraded{{end}}">
           {{if .CoreAvailable}}Registry connected{{else}}Registry unavailable{{end}}
         </span>
       </div>
 
-      <div class="columns">
-        <section class="panel">
-          <div class="panel-title">
+      <div class="mf-grid">
+        <section class="mf-panel" id="module-panel">
+          <div class="mf-panel__header">
             <h3>Modules</h3>
             <span>{{.ModuleCount}}</span>
           </div>
           {{if eq .ModuleCount 0}}
-            <p class="empty">등록된 Module이 없어.</p>
+            <p class="mf-empty">등록된 Module이 없어.</p>
           {{else}}
             {{range .Modules}}
-              <article class="item">
+              <article class="mf-list-item" data-module-id="{{.ID}}">
                 <div>
                   <strong>{{.Name}}</strong>
                   <small>{{.ID}}</small>
@@ -89,21 +89,21 @@
           {{end}}
         </section>
 
-        <section class="panel">
-          <div class="panel-title">
+        <section class="mf-panel" id="resource-panel">
+          <div class="mf-panel__header">
             <h3>Resources</h3>
             <span>{{.ResourceCount}}</span>
           </div>
           {{if eq .ResourceCount 0}}
-            <p class="empty">등록된 Resource가 없어.</p>
+            <p class="mf-empty">등록된 Resource가 없어.</p>
           {{else}}
             {{range .Resources}}
-              <article class="item resource">
+              <article class="mf-list-item mf-list-item--resource" data-resource-id="{{.ID}}">
                 <div>
                   <strong>{{.Name}}</strong>
                   <small>{{.ID}} · {{.Type}}</small>
                 </div>
-                <div class="caps">
+                <div class="mf-capability-list">
                   {{range .Provides.Capabilities}}
                     <span>{{.ID}} @ {{.Version}}</span>
                   {{end}}
@@ -115,7 +115,7 @@
       </div>
     </section>
 
-    <footer>
+    <footer class="mf-footer">
       <span>MANAFIELD / MANAGE MODULE</span>
       <span>Observation first · mutation later</span>
     </footer>
