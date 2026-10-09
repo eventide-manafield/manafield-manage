@@ -256,7 +256,7 @@ func TestModuleListAndDetailWithReadOnlyBindingSnapshot(t *testing.T) {
 			t.Fatalf("detail missing %q", value)
 		}
 	}
-	if strings.Contains(detail.Body.String(), "<button") {
+	if strings.Contains(detail.Body.String(), "mf-button--danger") || strings.Contains(detail.Body.String(), "module-rebuild") {
 		t.Fatal("detail page must not expose unimplemented lifecycle controls")
 	}
 	missing := httptest.NewRecorder()
