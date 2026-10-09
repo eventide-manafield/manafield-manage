@@ -119,6 +119,10 @@ func makeModuleViews(
 
 			if snapshot == nil {
 				item.Status = "바인딩 정보 없음"
+				if len(item.Candidates) == 0 {
+					item.Status = "Provider 없음"
+					item.Warning = true
+				}
 			} else {
 				item.Target = strings.TrimSpace(bindings[slot])
 				item.Bound = item.Target != ""
@@ -143,7 +147,7 @@ func makeModuleViews(
 		}
 		summaries = append(summaries, moduleSummary{
 			Module: module,
-			DetailURL: "/modules/" + module.ID,
+			DetailURL: moduleDetailURL(module.ID),
 			RequiredBound: detail.RequiredBound, RequiredTotal: detail.RequiredCount,
 			BindingsKnown: detail.BindingsKnown || detail.RequiredCount == 0,
 			Warnings: detail.Warnings,
