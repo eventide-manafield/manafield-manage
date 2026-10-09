@@ -8,10 +8,29 @@ import (
 	"strings"
 )
 
+// Capability requirements are keyed by the consuming module's local binding slot.
+// The Core v0 descriptor has required slots only; Optional is reserved for modules
+// that add explicit optional requirements in a future contract revision.
+type Requirement struct {
+	ID       string `json:"id"`
+	Version  string `json:"version"`
+	Optional bool   `json:"optional,omitempty"`
+}
+
+type RequirementSet struct {
+	Capabilities map[string]Requirement `json:"capabilities"`
+}
+
+type CapabilitySet struct {
+	Capabilities []Capability `json:"capabilities"`
+}
+
 type Module struct {
-	ID      string `json:"id"`
-	Name    string `json:"name"`
-	Version string `json:"version"`
+	ID       string         `json:"id"`
+	Name     string         `json:"name"`
+	Version  string         `json:"version"`
+	Requires RequirementSet `json:"requires"`
+	Provides CapabilitySet  `json:"provides"`
 }
 
 type Capability struct {
@@ -20,12 +39,10 @@ type Capability struct {
 }
 
 type Resource struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Type     string `json:"type"`
-	Provides struct {
-		Capabilities []Capability `json:"capabilities"`
-	} `json:"provides"`
+	ID       string        `json:"id"`
+	Name     string        `json:"name"`
+	Type     string        `json:"type"`
+	Provides CapabilitySet `json:"provides"`
 }
 
 type Client struct {

@@ -68,6 +68,7 @@
         </span>
       </div>
 
+      {{if .BindingsError}}<p class="mf-info" role="status">바인딩 스냅샷을 읽을 수 없어. 현재 바인딩 수는 확인 불가로 표시돼.</p>{{end}}
       <div class="mf-grid">
         <section class="mf-panel" id="module-panel">
           <div class="mf-panel__header">
@@ -78,12 +79,17 @@
             <p class="mf-empty">등록된 Module이 없어.</p>
           {{else}}
             {{range .Modules}}
-              <article class="mf-list-item" data-module-id="{{.ID}}">
-                <div>
-                  <strong class="mf-list-item__name">{{.Name}}</strong>
-                  <small class="mf-list-item__meta">{{.ID}}</small>
+              <article class="mf-list-item" data-module-id="{{.Module.ID}}">
+                <div class="mf-list-item__content">
+                  <strong class="mf-list-item__name">{{.Module.Name}}</strong>
+                  <small class="mf-list-item__meta">{{.Module.ID}}</small>
+                  <span class="mf-binding-summary">필수 바인딩 : {{if .BindingsKnown}}{{.RequiredBound}}/{{.RequiredTotal}}{{else}}확인 불가{{end}}</span>
                 </div>
-                <span class="mf-list-item__version">v{{.Version}}</span>
+                <div class="mf-list-item__actions">
+                  <small class="mf-list-item__version">v{{.Module.Version}}</small>
+                  {{if .Warnings}}<span class="mf-warning" role="img" aria-label="바인딩 경고" title="{{range .Warnings}}{{.}} {{end}}">⚠</span>{{end}}
+                  <a class="mf-button" href="{{.DetailURL}}" aria-label="{{.Module.Name}} 상세보기">상세보기</a>
+                </div>
               </article>
             {{end}}
           {{end}}
