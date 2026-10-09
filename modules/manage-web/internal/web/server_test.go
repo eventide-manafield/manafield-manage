@@ -2,6 +2,8 @@ package web
 
 import (
 	"io"
+	"os"
+	"path/filepath"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -175,5 +177,75 @@ func TestActionStylesRemainExternal(t *testing.T) {
 	if rec.Code != http.StatusOK { t.Fatalf("CSS status = %d", rec.Code) }
 	for _, name := range []string{".mf-button", ".mf-button--danger", ".mf-stat__label", ".mf-list-item__name"} {
 		if !strings.Contains(rec.Body.String(), name) { t.Errorf("missing CSS hook %s", name) }
+	}
+}
+
+func TestModuleListAndDetailWithReadOnlyBindingSnapshot(t *testing.T) {
+	dir := t.TempDir()
+	snapshot := filepath.Join(dir, "safe-bindings.json")
+	if err := os.WriteFile(snapshot, []byte(`{"modules":{"consumer":{"state":"postgres"}}}`), 0600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("MANAFIELD_MANAGE_BINDINGS_FILE", snapshot)
+	core := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/modules":
+			_, _ = w.Write([]byte(`[{"id":"consumer","name":"Consumer","version":"0.0.1","requires":{"capabilities":{"state":{"id":"database.postgresql","version":"^1.0.0"},"cache":{"id":"cache.redis","version":"^1.0.0","optional":true}}},"operations":[]}]`))
+		case "/resources":
+			_, _ = w.Write([]byte(`[{"id":"postgres","name":"Postgres","type":"postgresql","provides":{"capabilities":[{"id":"database.postgresql","version":"2.0.0"}]}}]`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer core.Close()
+	handler, err := New(coreclient.New(core.URL, core.Client()), "test")
+	if err != nil { t.Fatal(err) }
+
+	index := httptest.NewRecorder()
+	handler.ServeHTTP(index, httptest.NewRequest(http.MethodGet, "/", nil))
+	if index.Code != http.StatusOK { t.Fatalf("index HTTP %d", index.Code) }
+	for _, value := range []string{
+		"필수 바인딩 : 1/1", "data-module-id=\"consumer\"", "href=\"/modules/consumer\"",
+		"mf-warning",
+	} {
+		if !strings.Contains(index.Body.String(), value) { t.Fatalf("index missing %q", value) }
+	}
+
+	detail := httptest.NewRecorder()
+	handler.ServeHTTP(detail, httptest.NewRequest(http.MethodGet, "/modules/consumer", nil))
+	if detail.Code != http.StatusOK { t.Fatalf("detail HTTP %d: %s", detail.Code, detail.Body.String()) }
+	for _, value := range []string{
+		"전체 요구사항 : 2개", "필수 1개 / 선택 1개", "필수 바인딩 : 1/1",
+		"버전 불일치", "Provider 없음", "database.postgresql", "cache.redis",
+		"postgres", "2.0.0", "data-requirement-slot=\"state\"",
+	} {
+		if !strings.Contains(detail.Body.String(), value) { t.Fatalf("detail missing %q", value) }
+	}
+	if strings.Contains(detail.Body.String(), "<button") {
+		t.Fatal("detail page must not expose unimplemented lifecycle controls")
+	}
+	missing := httptest.NewRecorder()
+	handler.ServeHTTP(missing, httptest.NewRequest(http.MethodGet, "/modules/not-installed", nil))
+	if missing.Code != http.StatusNotFound { t.Fatalf("unknown module HTTP %d", missing.Code) }
+}
+
+func TestUnknownBindingsDisplayUnknownNotZero(t *testing.T) {
+	t.Setenv("MANAFIELD_MANAGE_BINDINGS_FILE", "")
+	core := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/modules" {
+			_, _ = w.Write([]byte(`[{"id":"consumer","name":"Consumer","version":"0.0.1","requires":{"capabilities":{"state":{"id":"database.postgresql","version":"^1.0.0"}}},"operations":[]}]`))
+		} else {
+			_, _ = w.Write([]byte(`[{"id":"postgres","name":"Postgres","type":"postgresql","provides":{"capabilities":[{"id":"database.postgresql","version":"1.0.0"}]}}]`))
+		}
+	}))
+	defer core.Close()
+	handler, err := New(coreclient.New(core.URL, core.Client()), "test")
+	if err != nil { t.Fatal(err) }
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/", nil))
+	if !strings.Contains(rec.Body.String(), "필수 바인딩 : 확인 불가") {
+		t.Fatalf("unconfigured bindings must not be displayed as 0/1: %s", rec.Body.String())
 	}
 }
