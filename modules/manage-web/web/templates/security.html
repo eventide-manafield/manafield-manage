@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="ko">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+<title>로그인 감사 이력 · Manafield Manage</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<main class="mf-layout" id="security-audit">
+  <header class="mf-header"><a class="mf-brand" href="/">Manafield <small>Manage</small></a></header>
+  <section class="mf-hero mf-hero--compact">
+    <p class="mf-eyebrow">SECURITY / AUDIT</p>
+    <h1>로그인 감사 이력</h1>
+    <p class="mf-lead">Account Core 최근 50건 · log.audit.read 권한을 가진 사용자만 열람 가능</p>
+  </section>
+  <nav class="mf-section" aria-label="로그인 결과 필터">
+    <a class="mf-button" href="/security/login-history">전체</a>
+    <a class="mf-button" href="/security/login-history?outcome=success">성공</a>
+    <a class="mf-button" href="/security/login-history?outcome=failure">실패</a>
+    <a class="mf-button" href="/security/login-history?outcome=blocked">차단</a>
+    <a class="mf-button" href="/security/login-history?outcome=error">오류</a>
+  </nav>
+  <section class="mf-section">
+    {{if not .Entries}}<p class="mf-empty">조회된 로그인 이력이 없어.</p>{{end}}
+    {{range .Entries}}
+    <article class="mf-list-item">
+      <div class="mf-list-item__content">
+        <strong>{{.Outcome}} · {{.Username}}</strong>
+        <small>{{.OccurredAt.Format "2006-01-02 15:04:05 MST"}} · {{.Reason}}</small>
+        <small>IP: {{.PeerIP}} · {{.UserAgent}}</small>
+      </div>
+    </article>
+    {{end}}
+  </section>
+  <footer class="mf-footer">로그인 실패 시도도 포함 · 90일 보관</footer>
+</main>
+</body></html>

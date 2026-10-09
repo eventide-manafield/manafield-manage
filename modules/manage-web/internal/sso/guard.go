@@ -119,7 +119,8 @@ func (g *Guard) Wrap(next http.Handler) http.Handler {
 			}
 			return
 		}
-		if err := g.authenticate(r); err != nil {
+		subject, err := g.authenticate(r)
+		if err != nil {
 			if errors.Is(err, errUnauthenticated) {
 				if r.Method == "GET" || r.Method == "HEAD" {
 					http.Redirect(w, r, "/auth/login", 303)
@@ -131,11 +132,20 @@ func (g *Guard) Wrap(next http.Handler) http.Handler {
 			}
 			return
 		}
-		next.ServeHTTP(w, r)
+		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), identityContextKey{}, subject)))
 	})
 }
 
 var errUnauthenticated = errors.New("not authenticated")
+
+type identityContextKey struct{}
+
+// IdentityFromContext returns only the server-verified Account subject.
+// Never accept an identity UUID from browser query/header/cookies.
+func IdentityFromContext(ctx context.Context) string {
+	id, _ := ctx.Value(identityContextKey{}).(string)
+	return id
+}
 
 func (g *Guard) login(w http.ResponseWriter, r *http.Request) {
 	if r.Method != "GET" {
@@ -236,7 +246,7 @@ func (g *Guard) callback(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "SSO token exchange failed", 401)
 		return
 	}
-	if err := g.userInfo(r.Context(), value.AccessToken); err != nil {
+	if _, err := g.userInfo(r.Context(), value.AccessToken); err != nil {
 		http.Error(w, "SSO identity validation failed", 401)
 		return
 	}
@@ -266,44 +276,44 @@ func (g *Guard) callback(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Value: secret, Path: "/", Secure: true, HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: seconds})
 	http.Redirect(w, r, "/", 303)
 }
-func (g *Guard) userInfo(ctx context.Context, token string) error {
+func (g *Guard) userInfo(ctx context.Context, token string) (string, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", g.cfg.UserInfoURL, nil)
 	if err != nil {
-		return err
+		return "", err
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	resp, err := g.client.Do(req)
 	if err != nil {
-		return err
+		return "", err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == 401 {
-		return errUnauthenticated
+		return "", errUnauthenticated
 	}
 	if resp.StatusCode != 200 {
-		return errors.New("identity provider unavailable")
+		return "", errors.New("identity provider unavailable")
 	}
 	var payload struct {
 		Subject string `json:"sub"`
 	}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 2048)).Decode(&payload); err != nil {
-		return err
+		return "", err
 	}
 	if payload.Subject == "" {
-		return errors.New("identity missing")
+		return "", errors.New("identity missing")
 	}
-	return nil
+	return payload.Subject, nil
 }
-func (g *Guard) authenticate(r *http.Request) error {
+func (g *Guard) authenticate(r *http.Request) (string, error) {
 	cookie, err := r.Cookie(sessionCookie)
 	if err != nil || len(cookie.Value) != 43 {
-		return errUnauthenticated
+		return "", errUnauthenticated
 	}
 	g.mu.Lock()
 	s, ok := g.sessions[digest(cookie.Value)]
 	g.mu.Unlock()
 	if !ok || time.Now().After(s.Until) {
-		return errUnauthenticated
+		return "", errUnauthenticated
 	}
 	return g.userInfo(r.Context(), s.Token)
 }

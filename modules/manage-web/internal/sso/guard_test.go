@@ -61,7 +61,12 @@ func TestPKCELoginCallbackAndRevocation(t *testing.T) {
 	}))
 	defer issuer.Close()
 	g := New(Config{AuthorizationURL: "https://account.test/account/oauth/authorize", TokenURL: issuer.URL + "/token", UserInfoURL: issuer.URL + "/userinfo", ClientID: "manage", RedirectURL: "https://manage.test/auth/callback"}, issuer.Client())
-	h := g.Wrap(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("PRIVATE_CONTENT")) }))
+	h := g.Wrap(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := IdentityFromContext(r.Context()); got != "00000000-0000-4000-8000-000000000001" {
+			t.Errorf("authenticated identity context missing: %q", got)
+		}
+		w.Write([]byte("PRIVATE_CONTENT"))
+	}))
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, httptest.NewRequest("GET", "https://manage.test/auth/login", nil))
 	if w.Code != 303 {
