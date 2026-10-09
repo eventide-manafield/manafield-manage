@@ -104,13 +104,18 @@ func (g *Guard) Wrap(next http.Handler) http.Handler {
 			g.loggedOut(w, r)
 			return
 		}
+		// A local explicit logout overrides even a stale still-valid session.
+		if isSignedOut(r) {
+			if r.Method == http.MethodGet || r.Method == http.MethodHead {
+				http.Redirect(w, r, "/auth/logged-out", http.StatusSeeOther)
+			} else {
+				http.Error(w, "unauthorized", http.StatusUnauthorized)
+			}
+			return
+		}
 		if err := g.authenticate(r); err != nil {
 			if errors.Is(err, errUnauthenticated) {
 				if r.Method == "GET" || r.Method == "HEAD" {
-					if isSignedOut(r) {
-						http.Redirect(w, r, "/auth/logged-out", http.StatusSeeOther)
-						return
-					}
 					http.Redirect(w, r, "/auth/login", 303)
 				} else {
 					http.Error(w, "unauthorized", 401)
