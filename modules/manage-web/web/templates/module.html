@@ -12,7 +12,12 @@
   <main class="mf-layout" id="manage-app">
     <header class="mf-header">
       <a class="mf-brand" id="manage-home-link" href="/">Manafield <small>Manage</small></a>
-      <span class="mf-header__version">manage {{.Version}}</span>
+      <div class="mf-header__controls">
+        <span class="mf-header__version">manage {{.Version}}</span>
+        <form method="post" action="/auth/logout">
+          <button class="mf-button" type="submit">로그아웃</button>
+        </form>
+      </div>
     </header>
 
     <nav class="mf-breadcrumb" aria-label="위치">
