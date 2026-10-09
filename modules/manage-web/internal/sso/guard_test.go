@@ -121,6 +121,14 @@ func TestForgedCallbackAndLogoutCSRF(t *testing.T) {
 	if denied.Code != 403 {
 		t.Fatalf("logout CSRF %d", denied.Code)
 	}
+	opaque := httptest.NewRequest("POST", "https://manage.test/auth/logout", nil)
+	opaque.Header.Set("Origin", "null")
+	opaque.Header.Set("Sec-Fetch-Site", "same-origin")
+	accepted := httptest.NewRecorder()
+	h.ServeHTTP(accepted, opaque)
+	if accepted.Code != 303 {
+		t.Fatalf("same-origin opaque browser logout denied: %d", accepted.Code)
+	}
 }
 
 func TestMissingSSOConfigFailsClosed(t *testing.T) {
