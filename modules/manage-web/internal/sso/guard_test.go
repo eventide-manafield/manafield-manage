@@ -74,7 +74,15 @@ func TestPKCELoginCallbackAndRevocation(t *testing.T) {
 	if u.Query().Get("code_challenge_method") != "S256" || len(u.Query().Get("code_challenge")) != 43 {
 		t.Fatal("no PKCE S256")
 	}
-	cookie := w.Result().Cookies()[0]
+	var cookie *http.Cookie
+	for _, c := range w.Result().Cookies() {
+		if c.Name == flowCookie {
+			cookie = c
+		}
+	}
+	if cookie == nil {
+		t.Fatal("missing SSO flow cookie")
+	}
 	state := u.Query().Get("state")
 	callback := "https://manage.test/auth/callback?state=" + url.QueryEscape(state) + "&code=" + strings.Repeat("c", 43)
 	req := httptest.NewRequest("GET", callback, nil)
