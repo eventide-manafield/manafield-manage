@@ -1,0 +1,7 @@
+# Local-only instance themes. Never publish private CSS.
+/modules/manage-web/custom.css
+/modules/manage-web/private/
+
+# Local binaries and test files
+/bin/
+*.test
