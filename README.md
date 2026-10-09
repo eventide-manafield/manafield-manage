@@ -62,6 +62,17 @@ Docker에서는 외부 CSS 파일을 **읽기 전용 볼륨**으로 마운트하
 
 > 주의: 개인 CSS를 서버에 설정하면 그 CSS는 해당 웹페이지를 방문한 브라우저에도 전달됩니다. Git 저장소에 넣지 않는 것과 웹 방문자에게 CSS를 숨기는 것은 다릅니다. 이 공개 저장소의 이전 커밋에 포함됐던 디자인 또한 Git 기록에 남아 있습니다.
 
+### Web UI 클래스와 기능 ID 규칙
+
+공개 Web UI는 중립적인 흑백 문서형 스타일을 유지하며, 모든 화면 전용 CSS 클래스는 `mf-` 접두사를 사용합니다. 컴포넌트 단위로 `mf-panel`, `mf-panel__header`, `mf-list-item`, `mf-list-item__name`처럼 역할을 구분하고, 상태와 변형에는 `mf-status--ok`, `mf-button--danger`처럼 `--` 접미사를 사용합니다.
+
+- **클래스(`class`)**: 재사용 가능한 시각적 구성·상태·커스터마이징 대상.
+- **ID(`id`)**: 화면에서 하나만 존재하는 기능적 고정 영역. 예: `#module-panel`, `#resource-panel`, `#core-connection-status`.
+- **데이터 속성**: 개수가 변하는 Module 및 Resource는 ID를 임의 생성하지 않고 `data-module-id` / `data-resource-id`로 구분.
+- **작업 버튼**: 일반 작업은 `mf-button`, 서비스 재시작·리빌드·업데이트 등 서버 상태를 바꾸는 작업은 `mf-button mf-button--danger`을 사용. 버튼에 고유한 실행 기능을 구현할 때만 안정적인 `id`를 부여합니다.
+
+현재 공개 `manage-web`은 읽기 전용이어서 서버 변경 버튼을 실제 화면에 표시하지 않습니다. 배포 엔진 및 권한 검증이 구현되기 전까지 관리 작업을 수행할 수 없습니다. 예시 화면의 버튼은 기능을 연결하지 않은 미리보기 요소입니다.
+
 ## Deployment
 
 모노레포 안의 모듈을 빌드할 때에는 `modules/manage-web`을 Docker build context로 사용합니다. Git 리비전과 모듈별 빌드 경로를 릴리스 메타데이터에 각각 남기는 방식을 지향합니다.
