@@ -11,6 +11,7 @@ import (
 	"os"
 	"strings"
 	"sort"
+	"net/url"
 	"time"
 
 	"github.com/eventide-manafield/manafield-manage/modules/manage-web/internal/coreclient"
@@ -23,13 +24,15 @@ type Server struct {
 	template *template.Template
 	static   http.Handler
 	customCSSFile string
+	bindingsFile string
 }
 
 type pageData struct {
 	Version         string
 	CustomCSS       bool
 	CoreAvailable   bool
-	Modules         []coreclient.Module
+	Modules         []moduleSummary
+	BindingsError   bool
 	Resources       []coreclient.Resource
 	ModuleCount     int
 	ResourceCount   int
@@ -41,7 +44,7 @@ func New(core *coreclient.Client, version string) (http.Handler, error) {
 		return nil, fmt.Errorf("Core client is required")
 	}
 
-	tmpl, err := template.ParseFS(webassets.FS, "templates/index.html")
+	tmpl, err := template.ParseFS(webassets.FS, "templates/index.html", "templates/module.html")
 	if err != nil {
 		return nil, fmt.Errorf("parse templates: %w", err)
 	}
@@ -62,12 +65,14 @@ func New(core *coreclient.Client, version string) (http.Handler, error) {
 		template: tmpl,
 		static:   http.FileServer(http.FS(staticFS)),
 		customCSSFile: customCSSFile,
+		bindingsFile: strings.TrimSpace(os.Getenv("MANAFIELD_MANAGE_BINDINGS_FILE")),
 	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/static/custom.css", server.customCSS)
 	mux.Handle("/static/", http.StripPrefix("/static/", server.static))
 	mux.HandleFunc("/manafield/health", server.health)
+	mux.HandleFunc("GET /modules/{id}", server.modulePage)
 	mux.HandleFunc("/", server.home)
 
 	return mux, nil
@@ -137,6 +142,12 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 	sort.Slice(modules, func(i, j int) bool { return modules[i].Name < modules[j].Name })
 	sort.Slice(resources, func(i, j int) bool { return resources[i].Name < resources[j].Name })
 
+	snapshot, bindingErr := readBindingSnapshot(s.bindingsFile)
+	if bindingErr != nil {
+		slog.Warn("Binding snapshot unavailable", "error", bindingErr)
+	}
+	moduleViews, _ := makeModuleViews(modules, resources, snapshot)
+
 	capabilityCount := 0
 	for _, resource := range resources {
 		capabilityCount += len(resource.Provides.Capabilities)
@@ -147,7 +158,8 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 		Version:         s.version,
 		CustomCSS:       s.hasCustomCSS(),
 		CoreAvailable:   coreAvailable,
-		Modules:         modules,
+		Modules:         moduleViews,
+		BindingsError:   bindingErr != nil,
 		Resources:       resources,
 		ModuleCount:     len(modules),
 		ResourceCount:   len(resources),
@@ -155,4 +167,59 @@ func (s *Server) home(w http.ResponseWriter, r *http.Request) {
 	}); err != nil {
 		slog.Error("render homepage", "error", err)
 	}
+}
+
+type modulePageData struct {
+	Version    string
+	CustomCSS  bool
+	Detail     moduleDetail
+	BackURL    string
+	SnapshotError bool
+}
+
+func (s *Server) modulePage(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	if id == "" {
+		http.NotFound(w, r)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+	defer cancel()
+	modules, modErr := s.core.ListModules(ctx)
+	resources, resErr := s.core.ListResources(ctx)
+	if modErr != nil || resErr != nil {
+		http.Error(w, "Module registry unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	var found bool
+	for _, mod := range modules {
+		if mod.ID == id {
+			found = true
+			break
+		}
+	}
+	if !found {
+		http.NotFound(w, r)
+		return
+	}
+	snapshot, err := readBindingSnapshot(s.bindingsFile)
+	if err != nil {
+		slog.Warn("Binding snapshot unavailable", "error", err)
+	}
+	_, details := makeModuleViews(modules, resources, snapshot)
+	detail := details[id]
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	if err := s.template.ExecuteTemplate(w, "module.html", modulePageData{
+		Version: s.version, CustomCSS: s.hasCustomCSS(),
+		Detail: detail, BackURL: "/", SnapshotError: err != nil,
+	}); err != nil {
+		slog.Error("render module details", "error", err)
+	}
+}
+
+// Escape dynamic module identifiers as URL path segments, not arbitrary links.
+func moduleDetailURL(id string) string {
+	return "/modules/" + url.PathEscape(id)
 }
