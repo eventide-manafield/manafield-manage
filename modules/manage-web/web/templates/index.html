@@ -22,7 +22,12 @@
         </span>
       </a>
 
-      <span class="mf-header__version">manage {{.Version}}</span>
+      <div class="mf-header__controls">
+        <span class="mf-header__version">manage {{.Version}}</span>
+        <form method="post" action="/auth/logout">
+          <button class="mf-button" type="submit">로그아웃</button>
+        </form>
+      </div>
     </header>
 
     <section class="mf-hero mf-hero--compact" id="manage-introduction">
