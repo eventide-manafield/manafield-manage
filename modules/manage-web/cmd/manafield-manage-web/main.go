@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/eventide-manafield/manafield-manage/modules/manage-web/internal/coreclient"
+	"github.com/eventide-manafield/manafield-manage/modules/manage-web/internal/sso"
 	manage "github.com/eventide-manafield/manafield-manage/modules/manage-web/internal/web"
 )
 
@@ -24,9 +25,16 @@ func main() {
 		os.Exit(1)
 	}
 
+	ssoConfig, err := sso.ConfigFromEnv()
+	if err != nil {
+		slog.Error("SSO configuration required: refusing to serve Manage without authentication", "error", err)
+		os.Exit(1)
+	}
+	guard := sso.New(ssoConfig, &http.Client{Timeout: 3 * time.Second})
+
 	server := &http.Server{
 		Addr:              addr,
-		Handler:           handler,
+		Handler:           guard.Wrap(handler),
 		ReadHeaderTimeout: 5 * time.Second,
 		IdleTimeout:       60 * time.Second,
 	}
