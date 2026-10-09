@@ -2,8 +2,6 @@ package web
 
 import (
 	"io"
-	"os"
-	"path/filepath"
 	"net/http"
 	"net/http/httptest"
 	"os"
