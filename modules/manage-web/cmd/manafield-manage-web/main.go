@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/eventide-manafield/manafield-manage/modules/manage-web/internal/coreclient"
- "github.com/eventide-manafield/manafield-manage/modules/manage-web/internal/sso"
+	"github.com/eventide-manafield/manafield-manage/modules/manage-web/internal/sso"
 	manage "github.com/eventide-manafield/manafield-manage/modules/manage-web/internal/web"
 )
 
