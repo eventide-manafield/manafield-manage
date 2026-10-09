@@ -46,12 +46,12 @@ func readBindingSnapshot(filename string) (*BindingSnapshot, error) {
 }
 
 type moduleSummary struct {
-	Module         coreclient.Module
-	DetailURL      string
-	RequiredBound  int
-	RequiredTotal  int
-	BindingsKnown  bool
-	Warnings       []string
+	Module        coreclient.Module
+	DetailURL     string
+	RequiredBound int
+	RequiredTotal int
+	BindingsKnown bool
+	Warnings      []string
 }
 
 type provider struct {
@@ -61,27 +61,27 @@ type provider struct {
 }
 
 type requirementDetail struct {
-	Slot          string
-	CapabilityID  string
-	VersionRange  string
-	Optional      bool
-	Bound         bool
-	Target        string
-	ProviderKind  string
-	FoundVersion  string
-	Status        string
-	Warning       bool
-	Candidates    []provider
+	Slot         string
+	CapabilityID string
+	VersionRange string
+	Optional     bool
+	Bound        bool
+	Target       string
+	ProviderKind string
+	FoundVersion string
+	Status       string
+	Warning      bool
+	Candidates   []provider
 }
 
 type moduleDetail struct {
-	Module           coreclient.Module
-	Requirements     []requirementDetail
-	RequiredCount    int
-	OptionalCount    int
-	RequiredBound    int
-	BindingsKnown    bool
-	Warnings         []string
+	Module        coreclient.Module
+	Requirements  []requirementDetail
+	RequiredCount int
+	OptionalCount int
+	RequiredBound int
+	BindingsKnown bool
+	Warnings      []string
 }
 
 func makeModuleViews(
@@ -146,11 +146,11 @@ func makeModuleViews(
 			detail.Requirements = append(detail.Requirements, item)
 		}
 		summaries = append(summaries, moduleSummary{
-			Module: module,
-			DetailURL: moduleDetailURL(module.ID),
+			Module:        module,
+			DetailURL:     moduleDetailURL(module.ID),
 			RequiredBound: detail.RequiredBound, RequiredTotal: detail.RequiredCount,
 			BindingsKnown: detail.BindingsKnown || detail.RequiredCount == 0,
-			Warnings: detail.Warnings,
+			Warnings:      detail.Warnings,
 		})
 		details[module.ID] = detail
 	}
