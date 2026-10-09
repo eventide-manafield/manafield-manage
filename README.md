@@ -128,6 +128,7 @@ This release implements OAuth 2.0 authorization code + PKCE S256 against Manafie
 MANAFIELD_MANAGE_SSO_AUTHORIZATION_URL=https://manafield.studio/account/oauth/authorize
 MANAFIELD_MANAGE_SSO_TOKEN_URL=http://module-manafield-account-core:8080/account/oauth/token
 MANAFIELD_MANAGE_SSO_USERINFO_URL=http://module-manafield-account-core:8080/account/oauth/userinfo
+MANAFIELD_MANAGE_SSO_END_SESSION_URL=http://module-manafield-account-core:8080/account/oauth/end-session
 MANAFIELD_MANAGE_SSO_CLIENT_ID=manafield-manage-web
 MANAFIELD_MANAGE_SSO_REDIRECT_URL=https://manage.manafield.studio/auth/callback
 ```
@@ -141,17 +142,20 @@ Manage issues its own `__Host-mf_manage_session` Secure/HttpOnly/SameSite=Lax ho
 
 ### Manage 로그아웃 동작
 
-`POST /auth/logout`은 Manage 전용 세션과 진행 중인 PKCE flow를 해제하고,
-`/auth/logged-out` 완료 화면에 머뭅니다. Account Core는 독립적인 중앙 SSO
-세션을 유지하므로, Manage에서 즉시 `/auth/login`으로 보내면 자동 재인증되어
-로그아웃 버튼이 동작하지 않는 것처럼 보였습니다.
+`POST /auth/logout`은 현재 Manage 세션에 연결된 **Account Core 중앙 로그인
+세션을 먼저 무효화**합니다. Manage는 서버 내부 OAuth 토큰으로
+`/account/oauth/end-session`을 호출하고, Account Core가 해당 Account 세션을
+삭제할 때 그 세션에서 발급된 OAuth 토큰과 인증 코드도 연쇄적으로
+무효화됩니다. 같은 Identity의 **다른 브라우저/기기 세션은 그대로 유지**됩니다.
 
-따라서 Manage는 `__Host-mf_manage_signed_out` Secure/HttpOnly/SameSite=Lax
-쿠키로 **명시적 로그아웃 의사**를 최대 24시간 유지합니다. 로그아웃된 브라우저는
-보호된 페이지로 직접 이동해도 다시 자동 로그인하지 않으며, 사용자가
-`/auth/login`의 **다시 로그인** 링크를 클릭할 때에만 이 표시를 해제하고
-Account Core 인증 코드 교환을 시작합니다.
+중앙 종료가 성공한 뒤에만 Manage 세션 및 PKCE flow를 삭제하고,
+`/auth/logged-out`으로 이동합니다. 중앙 종료에 실패하면 HTTP 502를
+반환하고 Manage 세션을 유지해 재시도할 수 있게 합니다. 브라우저에서
+Manage 세션이 이미 만료돼 중앙 토큰을 확보할 수 없는 경우에는
+HTTP 401로 안내하며, Account Core 계정 화면에서 별도 로그아웃해야 합니다.
 
-이 동작은 **Manage 서비스에서만 로그아웃**합니다. 다른 서비스의 세션이나
-`manafield.studio`의 Account Core 세션은 로그아웃하지 않습니다.
-향후 전체 앱 로그아웃은 명시적인 별도 OIDC/OAuth 세션 종료 기능으로 구현해야 합니다.
+`__Host-mf_manage_signed_out` 쿠키는 로그아웃 후 SSO 자동 재인증을
+방지하며, 사용자가 **다시 로그인**을 직접 선택할 때 해제됩니다.
+원래 `manafield.studio`의 `__Host-manafield_session` 쿠키는
+Manage에서 직접 삭제할 수 없지만, Account Core의 서버 세션 행이
+삭제되기 때문에 더 이상 유효하지 않습니다.

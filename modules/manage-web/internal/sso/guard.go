@@ -26,18 +26,24 @@ type Config struct {
 	AuthorizationURL string
 	TokenURL         string
 	UserInfoURL      string
+	EndSessionURL    string
 	ClientID         string
 	RedirectURL      string
 }
 
 func ConfigFromEnv() (Config, error) {
-	c := Config{os.Getenv("MANAFIELD_MANAGE_SSO_AUTHORIZATION_URL"),
-		os.Getenv("MANAFIELD_MANAGE_SSO_TOKEN_URL"), os.Getenv("MANAFIELD_MANAGE_SSO_USERINFO_URL"),
-		os.Getenv("MANAFIELD_MANAGE_SSO_CLIENT_ID"), os.Getenv("MANAFIELD_MANAGE_SSO_REDIRECT_URL")}
+	c := Config{
+		AuthorizationURL: os.Getenv("MANAFIELD_MANAGE_SSO_AUTHORIZATION_URL"),
+		TokenURL:         os.Getenv("MANAFIELD_MANAGE_SSO_TOKEN_URL"),
+		UserInfoURL:      os.Getenv("MANAFIELD_MANAGE_SSO_USERINFO_URL"),
+		EndSessionURL:    os.Getenv("MANAFIELD_MANAGE_SSO_END_SESSION_URL"),
+		ClientID:         os.Getenv("MANAFIELD_MANAGE_SSO_CLIENT_ID"),
+		RedirectURL:      os.Getenv("MANAFIELD_MANAGE_SSO_REDIRECT_URL"),
+	}
 	if c.ClientID == "" {
 		return c, errors.New("SSO client ID not configured")
 	}
-	for _, raw := range []string{c.AuthorizationURL, c.TokenURL, c.UserInfoURL, c.RedirectURL} {
+	for _, raw := range []string{c.AuthorizationURL, c.TokenURL, c.UserInfoURL, c.EndSessionURL, c.RedirectURL} {
 		parsed, err := url.Parse(raw)
 		if err != nil || parsed.Host == "" || parsed.User != nil || parsed.Fragment != "" ||
 			(parsed.Scheme != "http" && parsed.Scheme != "https") {
@@ -316,11 +322,28 @@ func (g *Guard) logout(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "forbidden", http.StatusForbidden)
 		return
 	}
-	if cookie, err := r.Cookie(sessionCookie); err == nil {
-		g.mu.Lock()
-		delete(g.sessions, digest(cookie.Value))
-		g.mu.Unlock()
+	// The Manage session contains the short-lived OAuth token tied to the
+	// originating Account Core login. Revoke the central session FIRST; do not
+	// claim success or discard retry credentials when the backchannel fails.
+	cookie, err := r.Cookie(sessionCookie)
+	if err != nil || len(cookie.Value) != 43 {
+		http.Error(w, "Manage session expired; sign out on Manafield Account", http.StatusUnauthorized)
+		return
 	}
+	g.mu.Lock()
+	current, ok := g.sessions[digest(cookie.Value)]
+	g.mu.Unlock()
+	if !ok || time.Now().After(current.Until) {
+		http.Error(w, "Manage session expired; sign out on Manafield Account", http.StatusUnauthorized)
+		return
+	}
+	if err := g.endCentralSession(r.Context(), current.Token); err != nil {
+		http.Error(w, "Central logout unavailable; please retry", http.StatusBadGateway)
+		return
+	}
+	g.mu.Lock()
+	delete(g.sessions, digest(cookie.Value))
+	g.mu.Unlock()
 	if cookie, err := r.Cookie(flowCookie); err == nil {
 		g.mu.Lock()
 		delete(g.flows, cookie.Value)
@@ -329,8 +352,8 @@ func (g *Guard) logout(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{Name: sessionCookie, Path: "/", Secure: true, HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: -1})
 	http.SetCookie(w, &http.Cookie{Name: flowCookie, Path: "/", Secure: true, HttpOnly: true, SameSite: http.SameSiteLaxMode, MaxAge: -1})
 	markSignedOut(w)
-	// Do NOT redirect to /auth/login: the independent Account Core session
-	// would silently issue a fresh code, making logout look ineffective.
+	// Account Core login session and its delegated tokens are now invalidated.
+	// Do not send the user straight into SSO again.
 	http.Redirect(w, r, "/auth/logged-out", http.StatusSeeOther)
 }
 func origin(raw string) string {

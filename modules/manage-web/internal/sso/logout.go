@@ -62,8 +62,9 @@ func (g *Guard) loggedOut(w http.ResponseWriter, r *http.Request) {
 <body>
   <main>
     <h1>Manage에서 로그아웃했어.</h1>
-    <p>Manafield Account의 중앙 로그인 상태는 그대로 유지돼.
-    Manage에 다시 들어가려면 아래 버튼을 눌러 로그인해 줘.</p>
+    <p>Manage와 Manafield Account의 현재 로그인 세션을 종료했어.
+    다른 기기의 로그인 상태는 그대로 유지돼.
+    다시 로그인하려면 아래 버튼을 눌러 줘.</p>
     <a href="/auth/login">다시 로그인</a>
   </main>
 </body>
