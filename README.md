@@ -8,7 +8,7 @@ Manafield 인스턴스를 관측하고 관리하기 위한 **공개 모듈 모�
 
 | Directory | Module ID | Status | Purpose |
 | --- | --- | --- | --- |
-| `modules/manage-web/` | `manafield-manage-web` | Initial implementation | Core Registry의 Module / Resource / Capability 조회 |
+| `modules/manage-web/` | `manafield-manage-web` | 운영 v0 (읽기 전용) | Core Registry/Binding 진단, OAuth2/PKCE SSO, Role 보호 로그인 감사 이력 조회 |
 
 추후 후보:
 - `modules/manage-lifecycle/`: Module 재시작, 리빌드, 업데이트 요청 및 작업 상태 표시
@@ -101,13 +101,13 @@ MANAFIELD_MANAGE_BINDINGS_FILE=/run/manafield/manage/bindings.json
 
 설정하지 않거나 파일을 읽지 못하면 **필수 바인딩 : 확인 불가**로 표시하고 `0/m`으로 추정하지 않습니다. 요구사항이 없는 모듈만 `0/0`으로 표시합니다. 스냅샷이 설정된 경우 목록에 없는 모듈의 Binding은 지정되지 않은 것으로 취급하므로, 배포 시 모듈 목록 전체를 포함한 최신 스냅샷으로 원자적으로 교체해야 합니다.
 
-현재 버전에서는 스냅샷 추출/동기화 자동화와 Core Binding 조회 API는 아직 제공하지 않습니다. Manage Web 자체는 읽기 전용이며, 배포·권한 변경은 수행하지 않습니다.
+**Jenkins 배포 경로는** `manafield bindings export`로 후보 스냅샷을 생성한 뒤 Core/Module 등록 검증에 성공한 경우에만 인스턴스의 `manage-assets/bindings.json`을 원자적으로 교체합니다. **Manage Web은** 이 비공개 파일을 읽기만 하며, Core의 실시간 Binding 조회 API는 아직 없습니다. CLI 직접 배포가 같은 게시 동작을 수행한다고 가정하면 안 됩니다. Manage Web은 운영 변경을 수행하지 않습니다.
 
 ## Deployment
 
 모노레포 안의 모듈을 빌드할 때에는 `modules/manage-web`을 Docker build context로 사용합니다. Git 리비전과 모듈별 빌드 경로를 릴리스 메타데이터에 각각 남기는 방식을 지향합니다.
 
-현재 서버에 배포된 기존 로컬 `manafield-manage` 모듈은 별도로 유지합니다. 공개 저장소로의 첫 코드 이전이 기존 인스턴스의 설정을 자동으로 변경하거나 배포하지는 않습니다.
+운영 Instance의 `manafield-manage-web`는 이 공개 저장소의 Git 소스에서 빌드됩니다. 과거 로컬 `manafield-manage` 프로토타입은 별개 코드이며, 현재 공식 Manage Web의 기능·배포 상태를 판단하는 기준이 아닙니다.
 
 ## Related
 
@@ -137,8 +137,17 @@ The public authorization URL is used only in a browser redirect; token exchange 
 
 Manage issues its own `__Host-mf_manage_session` Secure/HttpOnly/SameSite=Lax host-only cookie. This holds a random session ID only: Account Core Bearer tokens are kept in the Manage server process memory. Every protected request verifies the identity's active status through Account Core userinfo. Manage sessions have a maximum lifetime of 15 minutes; process restart invalidates outstanding sessions. Login and logout do not expose Account Core's browser cookie to Manage.
 
-**SSO is authentication, not authorization.** The current Manage UI remains read-only, and a logged-in account has not yet been checked for a particular Role. Do not enable mutating management operations until the Account Role Permission check is implemented. The current integration is a first-party OAuth/PKCE subset, not full OIDC; OIDC Discovery, ID Tokens and JWKS remain future work.
+**SSO is authentication, not authorization.** All main Manage routes require a valid SSO session; `/security/login-history` additionally checks the verified Account subject for the effective Account Role permission `log.audit.read` on every request. An authenticated user without this permission receives HTTP 403. Other mutation operations remain unimplemented. The SSO integration is a first-party OAuth/PKCE subset, not full OIDC; OIDC Discovery, ID Tokens and JWKS remain future work.
 
+
+### 로그인 감사 이력 조회 (Role 기반, 읽기 전용)
+
+- 경로: `GET /security/login-history`, `?outcome=success|failure|blocked|error` 필터. Account Core가 보유한 최근 최대 50건을 표시합니다.
+- SSO Guard가 Account Core의 `userinfo` 응답으로 검증한 **Identity UUID**만 Permission 검사에 사용합니다. URL 파라미터나 브라우저 헤더의 ID를 신뢰하지 않습니다.
+- Account Role의 `POST /manafield/authorization/check`에서 **`log.audit.read`** 유효 권한을 검사하고, 성공한 경우에만 Account Core의 `GET /manafield/login-history`를 호출합니다. 권한 실패 시 `403`, 백엔드 검사 실패 시 `503`으로 기본 거부합니다.
+- Jenkins는 Manage에 **Role 검사 전용 토큰**(`MANAFIELD_MANAGE_ROLE_AUTH_CHECK_TOKEN_FILE`)과 **Account 감사 이력 읽기 전용 토큰**(`MANAFIELD_MANAGE_ACCOUNT_AUDIT_READ_TOKEN_FILE`)만 파일로 마운트합니다. 전체 Account/Role 운영자 관리 토큰은 Manage로 전달하지 않습니다.
+- 계정 이름이 `admin`이라고 자동으로 `log.audit.read`가 부여되지 않습니다. 권한 부여는 신뢰된 Operator가 Account Role 관리 CLI에서 명시적으로 수행합니다.
+- 이 화면은 Account Core의 로그인 이력을 조회합니다. **Rust Core의 JSONL/PostgreSQL 로그 통합 웹 뷰어는 아닙니다.**
 
 ### Manage 로그아웃 동작
 
